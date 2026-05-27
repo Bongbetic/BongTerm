@@ -7,5 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+tokio = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
