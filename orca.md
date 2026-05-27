@@ -83,45 +83,8 @@ Phase 6 (Dogfood → Public)
 
 ## PHASE 0 — Scaffold, Foundations, Wave 0 Spikes
 
-> **[BLOCKED — 0.E through 0.K]** All remaining Phase 0 tasks require compilation.
-> Prerequisites before resuming 0.E:
-> 1. Install Rust: `winget install Rustlang.Rustup` → restart terminal → `rustup toolchain install 1.95-x86_64-pc-windows-msvc --component rustfmt clippy llvm-tools-preview`
-> 2. Initialize submodule: `git submodule update --init --recursive` → `cd vendor/wezterm && git checkout 20240203-110809-5046fc22`
->
-> After both prerequisites satisfied, resume at **0.E** using strict TDD: write failing test → implement minimum code → `cargo test` passes → `cargo clippy -D warnings` clean → commit.
 
-### 0.E Core Port Traits [block: Rust not installed] (TDD per trait: failing test → impl → pass → commit)
-
-- 0.E.1 `SecretRef`, `SecretValue` (redaction-safe `Display`/`Debug`/`Drop`), `SecretStore`, `ExposureClass`, `ConsumerId`, `ResolveError`
-- 0.E.2 `bongterm-storage-api`: `BlockRepo`, `PaneRepo`, `SessionRepo`, `WorkspaceRepo`, `TranscriptRepo`, `AgentRunRepo`, `McpCallRepo`, `ToolAuditRepo`, `SecretAuditRepo`, `LedgerRepo`, `MigrationRunner` + DTOs with serde round-trip tests
-- 0.E.3 `TerminalSession` trait + `MockTerminalSession` + recorded-script test
-- 0.E.4 `RendererBackend` trait + `MockRendererBackend` (no wgpu/glyphon imports yet)
-- 0.E.5 `AgentAdapter`, `AgentOutputClassifier`, `AgentCapabilities`, `LaunchMode`, `ControlChannel`, `CapabilityLevel`, `Reliability`, `DetectionMode`, `McpSupport`, `AgentLaunchSpec`, `ProcessSpec`, `OutputChunk`, `AgentEvent`, `ExitState`, `AgentExitSummary`, `AuthState`, `DiscoveryResult` + `MockAgentAdapter`
-- 0.E.6 `McpTransport` trait + `MockMcpTransport` rejecting `npx -y` argv
-- 0.E.7 `PolicyEvaluator` trait + `Decision` enum (Allow / RequireApproval / Deny / Advisory) + `EnforcementLevel` enum + test asserting Advisory display never contains "blocked"
-- 0.E.8 `ProcessGovernor` + `JobObjectCaps` + `AdmissionController` + `AdmissionVerdict` + mocks
-- 0.E.9 `SettingsProvider` + typed `Settings` snapshot (via `arc-swap::ArcSwap`) + `MockSettingsProvider`
-- 0.E.10 `ErrorClass`, `DataLossRisk`, `EnforcementLevel`, `BongtError` types
-- 0.E.11 Conformance suite skeletons for all 9 traits
-- 0.E.12 Negative conformance suite (5 invariants: missing-secret-fails-closed, advisory-never-blocked, deny-never-spawns, approval-required-never-executes, redacted-exports-never-leak)
-- 0.E.tag Tag `v0.0.2-ports`
-
-### 0.F bongterm-term BongT-Owned Types [block: Rust not installed]
-
-- 0.F.1 `SurfaceSnapshot`, `CellRun`, `CursorState`, `CursorStyle`, `DirtyRegion`, `CellPosition` + JSON round-trip test
-- 0.F.2 `WezTermAdapter` scaffold (no wezterm-term wiring yet — lands Phase 1.B.3 after ADR-005) + monotonic seq test
-
-### 0.G bongterm-pty ConPTY [block: Rust not installed]
-
-- 0.G.1 `SlabPool` + `Slab` 8 KiB buffer pool with reuse-on-drop + concurrent-acquire test
-- 0.G.2 `PtyHost` trait + `ChildSpec` + `ScaffoldPtyHost` (real ConPTY wiring lands Phase 1.B.1)
-
-### 0.H CI Bootstrap
-
-- 0.H.1 `.github/workflows/ci.yml` (fmt, clippy, test, deny, check-deps, build, submodule cleanliness) ✅ DONE
-- 0.H.2 `xtask check-licenses` real impl (THIRD_PARTY_NOTICES.md from `cargo_metadata`) + `xtask sbom` minimal CycloneDX [block: Rust not installed]
-
-### 0.I Wave 0 Spikes [block: Rust not installed + submodule not initialized] (each: harness crate + run on reference HW + ADR + commit)
+### 0.I [next] Wave 0 Spikes (each: harness crate + run on reference HW + ADR + commit)
 
 - 0.I.1 **S1** wgpu + glyphon latency harness → `docs/adr/0003-wgpu-glyphon-latency.md` (ADR-002)
 - 0.I.2 **S2** VRAM 4-pane atlas eviction → `docs/adr/0004-atlas-eviction.md` (ADR-003)
@@ -129,15 +92,6 @@ Phase 6 (Dogfood → Public)
 - 0.I.4 **S3b** IME composition on selected shape (CJK candidate window, compose/cancel/commit, surrogate pairs, grapheme clusters) → `docs/adr/0006-ime-composition.md` (ADR-004b)
 - 0.I.5 **S4** wezterm-term API stability survey → `docs/adr/0007-wezterm-submodule.md` (ADR-005)
 - 0.I.tag Tag `v0.0.3-spikes-resolved`
-
-### 0.J Benchmark Harness [block: Rust not installed]
-
-- 0.J.1 `benches/parser_throughput.rs` criterion bench on synthetic mixed ANSI payload (1 MB / 10 MB / 100 MB)
-- 0.J.2 `xtask bench-report` real impl + `benchmark-report.md` output
-
-### 0.K Diagnostics + Panic Hook [block: Rust not installed]
-
-- 0.K.1 `bongterm-diagnostics::install_panic_hook` writes structured log under `%LOCALAPPDATA%\BongTerm\crashes\<utc>.log` + wired into `bongterm-app::main`
 
 ### 0.L Phase 0 Exit Gate
 

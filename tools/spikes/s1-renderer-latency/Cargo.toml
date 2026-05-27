@@ -12,7 +12,9 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-wgpu = { workspace = true }
+# Override workspace pin: glyphon 0.6 requires wgpu 22, not 0.20.
+# This spike is throwaway; the product crates still use wgpu 0.20 via workspace.
+wgpu = { version = "22", features = ["wgsl"] }
 glyphon = { workspace = true }
 winit = "0.30"
 bongterm-term = { path = "../../../crates/bongterm-term" }
