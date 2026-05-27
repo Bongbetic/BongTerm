@@ -84,24 +84,9 @@ Phase 6 (Dogfood → Public)
 ## PHASE 0 — Scaffold, Foundations, Wave 0 Spikes
 
 
-### 0.I [next] Wave 0 Spikes (each: harness crate + run on reference HW + ADR + commit)
+### 0.L [next] Phase 0 Exit Gate
 
-<!-- DO NOT mark 0.I complete until all 4 pending items below are verified and ADRs updated -->
-
-- 0.I.1 **S1** [pending user run] wgpu + glyphon latency harness → `docs/adr/0003-wgpu-glyphon-latency.md`
-  - Run: `cargo run --release -p s1-renderer-latency` (press 200 keys; paste stdout)
-  - ADR-003 Status: Pending p99 measurement
-- ~~0.I.2 **S2**~~ DONE — ADR-004 Accepted (703 glyphs = ~1.25 MB, well under 256 MB)
-- ~~0.I.3 **S3a**~~ DONE — ADR-005 Accepted (Iced Shader widget, single HWND)
-- 0.I.4 **S3b** [pending user run] IME composition → `docs/adr/0006-ime-composition.md`
-  - Run: `cargo run -p s3b-ime-composition` (enable CJK IME first; paste stdout)
-  - ADR-006 Status: Pending runtime validation
-- 0.I.5 **S4** [pending submodule] wezterm-term API → `docs/adr/0007-wezterm-submodule.md`
-  - Run: `! git submodule update --init vendor/wezterm` (stable connection required)
-  - ADR-007 Status: Not started
-- 0.I.tag Tag `v0.0.3-spikes-resolved` — **blocked until 0.I.1 + 0.I.4 + 0.I.5 complete**
-
-### 0.L Phase 0 Exit Gate
+### 0.L [next] Phase 0 Exit Gate
 
 - 0.L.1 Run all gate checks: `cargo build --workspace --release` / `cargo test --workspace` / `cargo fmt --check` / `cargo clippy -D warnings` / `cargo deny check` / `cargo xtask check-deps` / Wave 0 ADRs all "Accepted" / `cargo xtask bench-report` writes file / `cargo xtask doctor` no FAIL
 - 0.L.tag Tag `v0.0.4-phase0-exit`
