@@ -14,3 +14,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 toml = "0.8"
 walkdir = "2"
+cargo_metadata = "0.18"

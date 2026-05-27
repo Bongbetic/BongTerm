@@ -4,6 +4,7 @@ version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 publish = false
+license.workspace = true
 
 # Spike S4: wezterm-term / wezterm-mux / termwiz API stability survey.
 # Runs after submodule is initialized (git submodule update --init).

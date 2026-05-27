@@ -4,6 +4,7 @@ version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 publish = false
+license.workspace = true
 
 # Spike S3b: IME composition (CJK Pinyin) on the integration shape from ADR-005.
 # Runs after S3a. Tests: compose/cancel/commit, surrogate pairs, grapheme clusters.
