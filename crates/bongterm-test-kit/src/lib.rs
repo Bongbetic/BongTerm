@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+pub mod conformance;
+
 // Re-export EnforcementLevel from the canonical definition in bongterm-security.
 pub use bongterm_security::EnforcementLevel;
 

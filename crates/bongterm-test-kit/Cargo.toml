@@ -8,6 +8,17 @@ publish = false
 
 [dependencies]
 bongterm-security = { path = "../bongterm-security" }
+bongterm-secrets-api = { path = "../bongterm-secrets-api" }
+bongterm-storage-api = { path = "../bongterm-storage-api" }
+bongterm-term = { path = "../bongterm-term" }
+bongterm-render = { path = "../bongterm-render" }
+bongterm-agents = { path = "../bongterm-agents" }
+bongterm-mcp = { path = "../bongterm-mcp" }
+bongterm-process-control = { path = "../bongterm-process-control" }
+bongterm-settings = { path = "../bongterm-settings" }
 thiserror = { workspace = true }
+uuid = { workspace = true }
+time = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true }
