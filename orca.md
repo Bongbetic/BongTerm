@@ -81,17 +81,6 @@ Phase 6 (Dogfood → Public)
 
 ---
 
-## PHASE 0 — Scaffold, Foundations, Wave 0 Spikes
-
-
-### 0.L [next] Phase 0 Exit Gate
-
-### 0.L [next] Phase 0 Exit Gate
-
-- 0.L.1 Run all gate checks: `cargo build --workspace --release` / `cargo test --workspace` / `cargo fmt --check` / `cargo clippy -D warnings` / `cargo deny check` / `cargo xtask check-deps` / Wave 0 ADRs all "Accepted" / `cargo xtask bench-report` writes file / `cargo xtask doctor` no FAIL
-- 0.L.tag Tag `v0.0.4-phase0-exit`
-- 0.L.replan **Invoke `superpowers:writing-plans`** against spec §6.1 #1, #4–#8, #17, #28, #29 to flesh Phase 1 TDD-level tasks
-
 ---
 
 ## PHASE 1 — Usable Terminal *(outline; re-plan before execution)*
