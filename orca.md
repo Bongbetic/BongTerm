@@ -1,0 +1,332 @@
+# orca.md — BongTerm MVP-0 Task Orchestrator
+
+> **Single source of truth for what to do next.** Each completed task is **struck from this list in place** — when a task is done, edit this file and remove it. Do not mark with checkbox-done and leave; do not append history. This file shrinks over time.
+>
+> **Detailed plan** with TDD steps + code blocks: `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`. Refer to it for any task lacking context here.
+>
+> **Re-plan rule.** Before starting Phase N+1, invoke `superpowers:writing-plans` against the spec section that governs that phase. Phase 0 is fully fleshed in the plan; Phases 1-6 are outlines that gain TDD-level detail at their re-plan boundary.
+>
+> **Status legend** (in line, before task title):
+> - `[next]` = next actionable task
+> - `[block]` = blocked on a dependency named in parens
+> - everything else has no prefix
+
+---
+
+## Execution Model
+
+**Method:** Subagent-Driven via `superpowers:subagent-driven-development`. Each task dispatches one fresh subagent. Main thread reviews output between tasks, catches drift, then dispatches the next.
+
+**Task lifecycle:**
+1. Main thread reads this file, identifies `[next]` task
+2. Dispatches subagent with task + context from `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`
+3. Subagent executes, commits, returns result
+4. Main thread reviews: check code quality, gate compliance, type consistency
+5. If pass → remove task from this file → dispatch next
+6. If fail → subagent re-dispatched with specific correction + reason
+7. Repeat until section complete → phase exit gate → re-plan next phase
+
+**What "removed in-place" means:** Completed tasks are deleted from this file. The file gets shorter as work progresses. Git history is the audit trail if you ever need to see what was done.
+
+**Re-plan boundary:** Each phase ends with a `replan` item. At that point, invoke `superpowers:writing-plans` against the spec sections listed, produce TDD-level tasks for the next phase, append them here, then continue. Never implement a phase from outline-level tasks alone.
+
+---
+
+## Overall Journey: Empty Repo → Shipped MVP-0
+
+```
+Phase 0 (Scaffold + Spikes)
+  │  Repo, 20 crates, port traits, surface types, buffer pool, CI, Wave 0 ADRs
+  │  Exit: v0.0.4-phase0-exit — all Wave 0 ADRs accepted, gates green
+  ▼
+Phase 1 (Usable Terminal)
+  │  UX Contract → real ConPTY → wgpu renderer → panes/tabs → shell integration
+  │  → SQLite storage → resource dashboard
+  │  Exit: §6.1 P0 gates #1,#4-8,#17,#28,#29 green 7 consecutive nightlies
+  ▼
+Phase 2 (Agent Observability)
+  │  Claude Code + Codex adapters → transcript → file-change tracker
+  │  → approval queue UI → replay
+  │  Exit: §6.1 P0 gates #15,#24 green
+  ▼
+Phase 3 (Developer UX)
+  │  Cmd-K (Claude Code subprocess) → explainer → smart history
+  │  → snippets → background jobs → clickable patterns
+  │  Exit: §6.1 P0 gates #9-14 green
+  ▼
+Phase 4 (MCP + Secrets + Security)
+  │  MCP one-process-per-server → Context Optimizer v1
+  │  → DPAPI vault → redaction → dangerous-command policy
+  │  Exit: §6.1 P0 gates #16,#19,#23,#31 green + threat-model review
+  ▼
+Phase 5 (Hardening + Release Prep)
+  │  UIA accessibility → IME → DPI → signed MSIX
+  │  → parser fuzz CI → diagnostics → Wave 1 spikes resolved
+  │  Exit: §6.1 P0 gates #18,#20,#21,#25,#26,#30 green + clean-VM install smoke
+  ▼
+Phase 6 (Dogfood → Public)
+  │  Stage A: 30 working days solo dogfood (BongT as default terminal)
+  │  Stage B: 3-5 trusted users, 14 days, signed dev-channel MSIX
+  │  Brand review → trademark search → repo public flip → GitHub release
+  └─ v0.1.0-mvp0 SHIPPED
+```
+
+**Gate rule:** All 25 P0 acceptance gates must be green for 7 consecutive nightly CI runs before public release. P1 gates (6 total) may have documented exceptions in `known-issues.md` for an experimental-labeled release.
+
+**Reference hardware for all performance gates:** Ryzen 5 7535HS / 16 GB / RTX 2050 4 GB VRAM / Win11 24H2.
+
+**Spec:** `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md`
+**Plan (Phase 0 TDD detail):** `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`
+**ADR directory:** `docs/adr/`
+
+---
+
+## PHASE 0 — Scaffold, Foundations, Wave 0 Spikes
+
+> **[BLOCKED — 0.E through 0.K]** All remaining Phase 0 tasks require compilation.
+> Prerequisites before resuming 0.E:
+> 1. Install Rust: `winget install Rustlang.Rustup` → restart terminal → `rustup toolchain install 1.95-x86_64-pc-windows-msvc --component rustfmt clippy llvm-tools-preview`
+> 2. Initialize submodule: `git submodule update --init --recursive` → `cd vendor/wezterm && git checkout 20240203-110809-5046fc22`
+>
+> After both prerequisites satisfied, resume at **0.E** using strict TDD: write failing test → implement minimum code → `cargo test` passes → `cargo clippy -D warnings` clean → commit.
+
+### 0.E Core Port Traits [block: Rust not installed] (TDD per trait: failing test → impl → pass → commit)
+
+- 0.E.1 `SecretRef`, `SecretValue` (redaction-safe `Display`/`Debug`/`Drop`), `SecretStore`, `ExposureClass`, `ConsumerId`, `ResolveError`
+- 0.E.2 `bongterm-storage-api`: `BlockRepo`, `PaneRepo`, `SessionRepo`, `WorkspaceRepo`, `TranscriptRepo`, `AgentRunRepo`, `McpCallRepo`, `ToolAuditRepo`, `SecretAuditRepo`, `LedgerRepo`, `MigrationRunner` + DTOs with serde round-trip tests
+- 0.E.3 `TerminalSession` trait + `MockTerminalSession` + recorded-script test
+- 0.E.4 `RendererBackend` trait + `MockRendererBackend` (no wgpu/glyphon imports yet)
+- 0.E.5 `AgentAdapter`, `AgentOutputClassifier`, `AgentCapabilities`, `LaunchMode`, `ControlChannel`, `CapabilityLevel`, `Reliability`, `DetectionMode`, `McpSupport`, `AgentLaunchSpec`, `ProcessSpec`, `OutputChunk`, `AgentEvent`, `ExitState`, `AgentExitSummary`, `AuthState`, `DiscoveryResult` + `MockAgentAdapter`
+- 0.E.6 `McpTransport` trait + `MockMcpTransport` rejecting `npx -y` argv
+- 0.E.7 `PolicyEvaluator` trait + `Decision` enum (Allow / RequireApproval / Deny / Advisory) + `EnforcementLevel` enum + test asserting Advisory display never contains "blocked"
+- 0.E.8 `ProcessGovernor` + `JobObjectCaps` + `AdmissionController` + `AdmissionVerdict` + mocks
+- 0.E.9 `SettingsProvider` + typed `Settings` snapshot (via `arc-swap::ArcSwap`) + `MockSettingsProvider`
+- 0.E.10 `ErrorClass`, `DataLossRisk`, `EnforcementLevel`, `BongtError` types
+- 0.E.11 Conformance suite skeletons for all 9 traits
+- 0.E.12 Negative conformance suite (5 invariants: missing-secret-fails-closed, advisory-never-blocked, deny-never-spawns, approval-required-never-executes, redacted-exports-never-leak)
+- 0.E.tag Tag `v0.0.2-ports`
+
+### 0.F bongterm-term BongT-Owned Types [block: Rust not installed]
+
+- 0.F.1 `SurfaceSnapshot`, `CellRun`, `CursorState`, `CursorStyle`, `DirtyRegion`, `CellPosition` + JSON round-trip test
+- 0.F.2 `WezTermAdapter` scaffold (no wezterm-term wiring yet — lands Phase 1.B.3 after ADR-005) + monotonic seq test
+
+### 0.G bongterm-pty ConPTY [block: Rust not installed]
+
+- 0.G.1 `SlabPool` + `Slab` 8 KiB buffer pool with reuse-on-drop + concurrent-acquire test
+- 0.G.2 `PtyHost` trait + `ChildSpec` + `ScaffoldPtyHost` (real ConPTY wiring lands Phase 1.B.1)
+
+### 0.H CI Bootstrap
+
+- 0.H.1 `.github/workflows/ci.yml` (fmt, clippy, test, deny, check-deps, build, submodule cleanliness) ✅ DONE
+- 0.H.2 `xtask check-licenses` real impl (THIRD_PARTY_NOTICES.md from `cargo_metadata`) + `xtask sbom` minimal CycloneDX [block: Rust not installed]
+
+### 0.I Wave 0 Spikes [block: Rust not installed + submodule not initialized] (each: harness crate + run on reference HW + ADR + commit)
+
+- 0.I.1 **S1** wgpu + glyphon latency harness → `docs/adr/0003-wgpu-glyphon-latency.md` (ADR-002)
+- 0.I.2 **S2** VRAM 4-pane atlas eviction → `docs/adr/0004-atlas-eviction.md` (ADR-003)
+- 0.I.3 **S3a** Iced + `bongterm-render` device integration shape (pick: Shader-widget / multi-window-HWND / render-to-texture) → `docs/adr/0005-device-integration.md` (ADR-004a)
+- 0.I.4 **S3b** IME composition on selected shape (CJK candidate window, compose/cancel/commit, surrogate pairs, grapheme clusters) → `docs/adr/0006-ime-composition.md` (ADR-004b)
+- 0.I.5 **S4** wezterm-term API stability survey → `docs/adr/0007-wezterm-submodule.md` (ADR-005)
+- 0.I.tag Tag `v0.0.3-spikes-resolved`
+
+### 0.J Benchmark Harness [block: Rust not installed]
+
+- 0.J.1 `benches/parser_throughput.rs` criterion bench on synthetic mixed ANSI payload (1 MB / 10 MB / 100 MB)
+- 0.J.2 `xtask bench-report` real impl + `benchmark-report.md` output
+
+### 0.K Diagnostics + Panic Hook [block: Rust not installed]
+
+- 0.K.1 `bongterm-diagnostics::install_panic_hook` writes structured log under `%LOCALAPPDATA%\BongTerm\crashes\<utc>.log` + wired into `bongterm-app::main`
+
+### 0.L Phase 0 Exit Gate
+
+- 0.L.1 Run all gate checks: `cargo build --workspace --release` / `cargo test --workspace` / `cargo fmt --check` / `cargo clippy -D warnings` / `cargo deny check` / `cargo xtask check-deps` / Wave 0 ADRs all "Accepted" / `cargo xtask bench-report` writes file / `cargo xtask doctor` no FAIL
+- 0.L.tag Tag `v0.0.4-phase0-exit`
+- 0.L.replan **Invoke `superpowers:writing-plans`** against spec §6.1 #1, #4–#8, #17, #28, #29 to flesh Phase 1 TDD-level tasks
+
+---
+
+## PHASE 1 — Usable Terminal *(outline; re-plan before execution)*
+
+Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
+
+**Prerequisite — UX Contract artifacts under `docs/ux/`** (spec §9):
+
+- 1.UX.1 Main window layout sketch
+- 1.UX.2 Command palette behavior
+- 1.UX.3 Pane / tab model sketch
+- 1.UX.4 Agent sidebar sketch
+- 1.UX.5 Resource dashboard sketch
+- 1.UX.6 Error / recovery screen sketch
+- 1.UX.7 First-launch onboarding flow
+- 1.UX.8 Keyboard shortcut table
+- 1.UX.9 Notification taxonomy
+- 1.UX.10 Design tokens (typography, spacing, radius, motion, color, semantic status, danger, focus, high-contrast, reduced-motion)
+
+**Implementation outline:**
+
+- 1.A.1 Settings + JSON5 schema + `schemars`-generated `settings.schema.json` + last-known-good fallback
+- 1.A.2 Iced shell main window using ADR-005 integration shape
+- 1.A.3 Command palette + keyboard map
+- 1.A.4 Onboarding flow
+- 1.B.1 ConPTY child spawn (real `portable-pty` impl)
+- 1.B.2 PTY reader task + ring buffer hookup with backpressure
+- 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term
+- 1.B.4 Backpressure tests (slow renderer + slow transcript)
+- 1.B.5 Per-pane Surface + dirty-region emission
+- 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005
+- 1.C.2 Shared glyph atlas with LRU eviction per ADR-003
+- 1.C.3 Frame pacing controller respecting backpressure
+- 1.C.4 Renderer device-loss recovery (DXGI device-removed)
+- 1.C.5 VRAM ceiling enforcement
+- 1.D.1 Pane + tab model in `bongterm-mux` over vendored `wezterm-mux`
+- 1.D.2 Split h/v, resize, focus cycle
+- 1.D.3 Layout save/restore (workspace only, no detach daemon)
+- 1.E.1 Shell-integration OSC consumer in `bongterm-blocks`
+- 1.E.2 Confidence model: High / Medium / Low / Unsupported per shell
+- 1.E.3 Block boundary detection + tests against `tests/fixtures/osc/`
+- 1.E.4 Block actions: copy / rerun / attach / save snippet
+- 1.F.1 Resource dashboard Iced view
+- 1.F.2 `bongterm-ledger` 1 Hz sampler (CPU, RSS, IO, handles)
+- 1.F.3 VRAM sampling via DXGI `QueryVideoMemoryInfo`
+- 1.F.4 Per-process attribution: BongT / shell / conhost / agent / MCP / plugin-zero
+- 1.G.1 SQLite WAL + migration runner + `0001_init.sql`
+- 1.G.2 Sidecar chunk writer (blake3 + monotonic IDs + retention)
+- 1.G.3 Crash recovery scan on startup
+- 1.G.4 `xtask cleanup-chunks` real impl
+- 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
+- 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
+
+---
+
+## PHASE 2 — Agent Observability *(outline; re-plan before execution)*
+
+Gates: spec §6.1 #15, #24.
+
+- 2.A.1 `bongterm-agents::AgentAdapter` production wiring
+- 2.A.2 `ClaudeCodeAdapter::discover` (binary, version, auth)
+- 2.A.3 `ClaudeCodeAdapter::create_classifier` stateful
+- 2.A.4 `CodexCliAdapter::discover` + `create_classifier`
+- 2.A.5 `agent_adapter_conformance` passes for both
+- 2.B.1 Transcript writer (`TranscriptRepo` impl)
+- 2.B.2 File-change tracker via `git status --porcelain=v1`
+- 2.B.3 Approval queue UI with explicit `EnforcementLevel` labels
+- 2.B.4 Replay with summarized context (`summarize_exit` → re-launch with prefilled prompt)
+- 2.C.1 Agent sidebar Iced view
+- 2.C.2 Lifecycle controls: stop / kill process tree / restart
+- 2.C.3 Prompt-injection corpus seed (≥30 scenarios) + `xtask prompt-injection-corpus` real impl
+- 2.exit Phase 2 exit gate: §6.1 #15, #24 green
+- 2.replan **Invoke `superpowers:writing-plans`** for Phase 3
+
+---
+
+## PHASE 3 — Developer-UX *(outline; re-plan before execution)*
+
+Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
+
+- 3.A.1 `bongterm-devassist::ai` Claude Code subprocess wrapper
+- 3.A.2 Cmd-K palette entry, preview-only, explicit Run confirmation
+- 3.A.3 Failed-command explainer button on non-zero exit blocks
+- 3.A.4 "Claude Code not installed" graceful fallback UI
+- 3.B.1 `bongterm-devassist::history` smart filters `cwd:` `branch:` `agent:` `exit:` `time:` `shell:` `duration:`
+- 3.B.2 Frecency index in SQLite
+- 3.B.3 Ctrl+R smart history + palette integration
+- 3.C.1 `bongterm-devassist::snippets` JSON5 library with `${param:name}` placeholders
+- 3.C.2 Parameter prompt UI before run
+- 3.C.3 Snippet scope: workspace + global
+- 3.D.1 `bongterm-devassist::jobs` background pane execution
+- 3.D.2 Desktop toast on completion/failure (winrt Notifications API)
+- 3.D.3 Job list panel
+- 3.E.1 `bongterm-devassist::patterns` matchers for Node/Python/Rust/.NET/TS
+- 3.E.2 Clickable file:line spans (overlay only, no scrollback mutation)
+- 3.E.3 URL detection + OSC 8 hyperlink rendering
+- 3.exit Phase 3 exit gate: §6.1 #9-14 green
+- 3.replan **Invoke `superpowers:writing-plans`** for Phase 4
+
+---
+
+## PHASE 4 — MCP, Secrets, Security *(outline; re-plan before execution)*
+
+Gates: spec §6.1 #16, #19, #23, #31.
+
+- 4.A.1 `bongterm-mcp::Supervisor` real impl (1 proc / server / workspace)
+- 4.A.2 JobObject caps via `bongterm-process-control`
+- 4.A.3 MCP manual JSON config import + schema validation
+- 4.A.4 No `npx -y` policy + `forbidden-install-policy` test
+- 4.A.5 Idle shutdown only when no active agent attached
+- 4.A.6 Health check (30s) + RSS sample (1-2s) + restart-with-backoff
+- 4.B.1 Context Optimizer v1: per-agent tool allowlist + token-budget preview
+- 4.B.2 Temporary scoped MCP config generation for supporting agents
+- 4.B.3 Unavailable label for non-supporting agents
+- 4.C.1 `bongterm-vault-windows` DPAPI / Cred Mgr `SecretStore` impl
+- 4.C.2 `.env` import flow
+- 4.C.3 Vault-backed env mode at spawn (no plaintext on disk)
+- 4.C.4 Launch-time disclosure modal
+- 4.D.1 `bongterm-security::Redactor` corpus (AWS / GitHub PAT / OpenAI / Anthropic / JWT / SSH key / high-entropy)
+- 4.D.2 `xtask secret-leak-corpus` real impl
+- 4.D.3 Telemetry redaction preview UI before opt-in export
+- 4.E.1 Dangerous-command pattern matcher (`git push --force`, `rm -rf`, `kubectl delete`, `terraform destroy`)
+- 4.E.2 Workspace trust prompt for newly opened repos
+- 4.E.3 Production safety mode UI
+- 4.exit Phase 4 exit gate: §6.1 #16, #19, #23, #31 green + threat-model review
+- 4.replan **Invoke `superpowers:writing-plans`** for Phase 5
+
+---
+
+## PHASE 5 — Hardening + Release Preparation *(outline; re-plan before execution)*
+
+Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
+
+- 5.A.1 UIA provider over BongT terminal surface (Narrator reads active text / scrollback / blocks / tabs / panes / main controls)
+- 5.A.2 IME composition wired to ADR-004a/b shape
+- 5.A.3 Per-monitor DPI v2 + live DPI changes
+- 5.B.1 MSIX manifest in `packaging/msix/`
+- 5.B.2 `xtask package-msix` real impl
+- 5.B.3 Code-signing cert provisioning (OV first, EV evaluation ADR)
+- 5.B.4 Install/upgrade/uninstall smoke on clean Windows VM
+- 5.B.5 SmartScreen runbook `docs/runbook/smartscreen.md`
+- 5.C.1 Parser fuzzing wired into nightly CI with pinned nightly toolchain (`docs/runbook/fuzzing.md`)
+- 5.C.2 Defender real-time smoke nightly
+- 5.C.3 Forbidden-abstraction checks → runtime process-tree checks
+- 5.C.4 Renderer device-loss simulated test (DXGI device-removed)
+- 5.C.5 Crash-recovery suite wired (pane panic / renderer panic / MCP crash loop / SQLite busy / sidecar torn-write / disk quota)
+- 5.D.1 Diagnostic export flow with redaction preview
+- 5.D.2 Telemetry consent flow (off by default)
+- 5.D.3 `bongterm-diagnostics` minidump capture full impl
+- 5.E.1 **S5** Claude Code non-interactive output reliability across last 3 versions → ADR-006
+- 5.E.2 **S6** Codex CLI auth flow end-to-end → ADR-007
+- 5.E.3 **S7** Defender + EDR-friendly process supervision smoke → ADR-008 + security whitepaper
+- 5.E.4 **S8** Prompt-injection corpus expanded → ADR-009
+- 5.F.1 SBOM tooling decision (cargo-cyclonedx vs custom) + production impl
+- 5.F.2 Provenance attestation (`attestation.intoto.jsonl`)
+- 5.F.3 `known-issues.md` published
+- 5.F.4 Rollback plan documented in `docs/runbook/release.md`
+- 5.exit Phase 5 exit gate: §6.1 #18, #20, #21, #25, #26, #30 green + clean-VM signing + install smoke green
+- 5.replan **Invoke `superpowers:writing-plans`** for Phase 6
+
+---
+
+## PHASE 6 — Dogfood + Public Release *(outline; re-plan before execution)*
+
+Gates: spec §6.1 #22 + §6.6 ship-when checklist.
+
+- 6.A.1 Begin Stage A: BongT as default terminal; daily log in `docs/dogfood/<date>.md`
+- 6.A.2 Stage A workload minimums (per spec §6.2): ≥1 long-running cmd/wk, ≥1 explainer use/wk, ≥1 Cmd-K use/wk, ≥1 shell switch/wk, ≥1 agent run/working-day, ≥1 MCP session/wk if MCP shipped, ≥1 crash drill/wk
+- 6.A.3 Stage A exit: 30 working days; zero P0/P1 defects; zero confirmed secret leaks
+- 6.B.1 Recruit Stage B users (r/rust, r/PowerShell, r/commandline, ex-colleagues) — 3-5 people / 14 days
+- 6.B.2 Issue signed dev-channel MSIX + private feedback channel (Discord/Matrix)
+- 6.B.3 Aggregate findings; no public-facing defect
+- 6.C.1 Trademark search (USPTO + EUIPO + Indian TM DB + GitHub/npm/crates/domain)
+- 6.C.2 Brand-perception review (the "bong" connotation) → `docs/adr/0002-product-name.md` decision
+- 6.D.1 Repo public flip
+- 6.D.2 SmartScreen warm-up plan executed
+- 6.D.3 SECURITY.md inbox monitored
+- 6.D.4 GitHub release `v0.1.0-mvp0` with full artifact set (signed MSIX + cert + sha256 + checksums.txt + checksums.txt.sig + attestation.intoto.jsonl + THIRD_PARTY_NOTICES.md + sbom.cdx.json + benchmark-report.md + CHANGELOG.md + known-issues.md + SECURITY.md + INSTALL.md)
+- 6.D.5 Landing-page copy (spec §19.3)
+- 6.exit `v0.1.0-mvp0` shipped
+- 6.replan **Invoke `superpowers:writing-plans`** for `0.2.0` (v1: worktrees, attachments, devcontainer, branch graph, replay editor, cross-shell translator, HTTP/REST pane)
+
+---
+
+*End of orca.md. Tasks above are removed in-place when complete. Detailed TDD steps for Phase 0 in `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`.*
