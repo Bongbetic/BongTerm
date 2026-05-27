@@ -1,0 +1,4 @@
+[submodule "vendor/wezterm"]
+	path = vendor/wezterm
+	url = https://github.com/wez/wezterm.git
+	shallow = true

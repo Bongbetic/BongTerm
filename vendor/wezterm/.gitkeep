@@ -1,0 +1,2 @@
+# Placeholder — replaced by git submodule update --init --recursive
+# Run: git submodule update --init --recursive && cd vendor/wezterm && git checkout 20240203-110809-5046fc22
