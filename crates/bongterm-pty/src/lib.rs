@@ -1,14 +1,12 @@
-//! bongterm-pty
-//!
-//! See `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` §1.2 for the
-//! ownership matrix entry that governs what this crate may and may not own.
+//! `bongterm-pty` — `ConPTY` host + reusable byte buffers.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+pub mod ring;
+pub use ring::{Slab, SlabPool};
+
+pub mod host;
+pub use host::{ChildSpec, PtyChild, PtyHost, ScaffoldPtyHost};
