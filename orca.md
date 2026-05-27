@@ -2,44 +2,69 @@
 
 > **Single source of truth for what to do next.** Each completed task is **struck from this list in place** — when a task is done, edit this file and remove it. Do not mark with checkbox-done and leave; do not append history. This file shrinks over time.
 >
-> **Detailed plan** with TDD steps + code blocks: `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`. Refer to it for any task lacking context here.
+> **Re-plan rule.** Before starting Phase N+1, invoke `superpowers:writing-plans` against the spec section that governs that phase. Phases 1-6 are outlines only — they gain TDD-level detail at their re-plan boundary. **Never implement a phase from outline-level tasks alone.**
 >
-> **Re-plan rule.** Before starting Phase N+1, invoke `superpowers:writing-plans` against the spec section that governs that phase. Phase 0 is fully fleshed in the plan; Phases 1-6 are outlines that gain TDD-level detail at their re-plan boundary.
->
-> **Status legend** (in line, before task title):
+> **Status legend:**
 > - `[next]` = next actionable task
 > - `[block]` = blocked on a dependency named in parens
-> - everything else has no prefix
+> - no prefix = not yet the next item
 
 ---
 
-## Execution Model
+## Session Resume Guide
 
-**Method:** Subagent-Driven via `superpowers:subagent-driven-development`. Each task dispatches one fresh subagent. Main thread reviews output between tasks, catches drift, then dispatches the next.
+> **Read this section first on every new session.** Orients you without reading the full codebase.
 
-**Task lifecycle:**
-1. Main thread reads this file, identifies `[next]` task
-2. Dispatches subagent with task + context from `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`
-3. Subagent executes, commits, returns result
-4. Main thread reviews: check code quality, gate compliance, type consistency
-5. If pass → remove task from this file → dispatch next
-6. If fail → subagent re-dispatched with specific correction + reason
-7. Repeat until section complete → phase exit gate → re-plan next phase
+### Where to find context
 
-**What "removed in-place" means:** Completed tasks are deleted from this file. The file gets shorter as work progresses. Git history is the audit trail if you ever need to see what was done.
+| Question | Where to look |
+|----------|--------------|
+| What is BongTerm? | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` (canonical) or `docs/PRD/bongterm_prd_v5.md` (authoritative 3071-line PRD) |
+| What was decided architecturally? | `docs/adr/` — 7 ADRs, all Accepted |
+| What was built in Phase 0? | `git log --oneline v0.0.1-scaffold..v0.0.4-phase0-exit` |
+| What is the Phase 0 TDD plan (full detail)? | `docs/superpowers/plans/2026-05-27-bongt-mvp0.md` |
+| What crates exist? | Root `Cargo.toml` `[workspace.members]` — 20 product crates + xtask + 5 spike harnesses |
+| What port traits were defined? | `crates/bongterm-*/src/lib.rs` — each crate has trait + mock + conformance tests |
+| What did the Wave 0 spikes measure? | `docs/adr/0003-0007` — latency, VRAM, device integration, IME, wezterm API |
+| What are the hard constraints? | `CLAUDE.md` §Hard non-goals, §Security contract, §Terminal hot-path rules |
+| What CI gates exist? | `.github/workflows/` (skeleton) + `CLAUDE.md` §Required CI gates |
+| Memory from past sessions? | `C:\Users\souba\.claude\projects\C--Users-souba-Documents-Projects-BongT\memory\` |
 
-**Re-plan boundary:** Each phase ends with a `replan` item. At that point, invoke `superpowers:writing-plans` against the spec sections listed, produce TDD-level tasks for the next phase, append them here, then continue. Never implement a phase from outline-level tasks alone.
+### Phase completion status
+
+| Phase | Status | Tag | Exit condition |
+|-------|--------|-----|----------------|
+| **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
+| **Phase 1** Usable Terminal | ⏳ Re-plan required before start | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 2** Agent Observability | 📋 Outline only | — | §6.1 #15,#24 green |
+| **Phase 3** Developer UX | 📋 Outline only | — | §6.1 #9-14 green |
+| **Phase 4** MCP + Secrets + Security | 📋 Outline only | — | §6.1 #16,#19,#23,#31 green + threat-model review |
+| **Phase 5** Hardening + Release Prep | 📋 Outline only | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
+| **Phase 6** Dogfood → Public | 📋 Outline only | — | `v0.1.0-mvp0` shipped |
+
+### Key known issues / deferred items
+
+- **wezterm submodule gitlink** not created — `vendor/wezterm/.gitkeep` removed; fix cmd in `docs/adr/0007-wezterm-submodule.md` § "Fix required before Phase 1.B.3"
+- **wgpu workspace pin** must bump from `"0.20"` → `"22"` before Phase 1.C.1 (glyphon 0.6 requires wgpu ≥22; tracked in ADR-003 + ADR-005 Consequences)
+- **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
+- **CJK IME round-trip** — harness written (`cargo run -p s3b-ime-composition`); live test deferred to Phase 5 gate §6.1 #21
+
+### How to resume work
+
+1. Read this file to find `[next]`
+2. For context on the next task: check the column above for the right artifact
+3. Dispatch subagent per `superpowers:subagent-driven-development`
+4. Remove completed tasks in-place; move `[next]` to the following task
 
 ---
 
 ## Overall Journey: Empty Repo → Shipped MVP-0
 
 ```
-Phase 0 (Scaffold + Spikes)
-  │  Repo, 20 crates, port traits, surface types, buffer pool, CI, Wave 0 ADRs
-  │  Exit: v0.0.4-phase0-exit — all Wave 0 ADRs accepted, gates green
+Phase 0 (Scaffold + Spikes) ✅ COMPLETE — v0.0.4-phase0-exit
+  │  20 crates, port traits, surface types, buffer pool, CI skeleton, Wave 0 ADRs
   ▼
-Phase 1 (Usable Terminal)
+Phase 1 (Usable Terminal) ← RE-PLAN REQUIRED FIRST
   │  UX Contract → real ConPTY → wgpu renderer → panes/tabs → shell integration
   │  → SQLite storage → resource dashboard
   │  Exit: §6.1 P0 gates #1,#4-8,#17,#28,#29 green 7 consecutive nightlies
@@ -71,7 +96,7 @@ Phase 6 (Dogfood → Public)
   └─ v0.1.0-mvp0 SHIPPED
 ```
 
-**Gate rule:** All 25 P0 acceptance gates must be green for 7 consecutive nightly CI runs before public release. P1 gates (6 total) may have documented exceptions in `known-issues.md` for an experimental-labeled release.
+**Gate rule:** All 25 P0 acceptance gates must be green for 7 consecutive nightly CI runs before public release.
 
 **Reference hardware for all performance gates:** Ryzen 5 7535HS / 16 GB / RTX 2050 4 GB VRAM / Win11 24H2.
 
@@ -81,9 +106,11 @@ Phase 6 (Dogfood → Public)
 
 ---
 
----
-
 ## PHASE 1 — Usable Terminal *(outline; re-plan before execution)*
+
+> **[next] Re-plan step:** Invoke `superpowers:writing-plans` against spec §6.1 #1, #4–#8, #17, #28, #29 to produce TDD-level tasks for this phase. Do not start implementation tasks until that plan exists.
+>
+> Context for the re-plan: ADR-005 (Iced Shader widget), ADR-003 (wgpu latency confirmed), ADR-004 (atlas eviction), ADR-007 (wezterm-term API surface at `crates/bongterm-term/src/adapter.rs`).
 
 Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
@@ -108,11 +135,11 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 - 1.A.4 Onboarding flow
 - 1.B.1 ConPTY child spawn (real `portable-pty` impl)
 - 1.B.2 PTY reader task + ring buffer hookup with backpressure
-- 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term
+- 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
 - 1.B.4 Backpressure tests (slow renderer + slow transcript)
 - 1.B.5 Per-pane Surface + dirty-region emission
-- 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005
-- 1.C.2 Shared glyph atlas with LRU eviction per ADR-003
+- 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005 *(bump wgpu workspace pin to "22" first)*
+- 1.C.2 Shared glyph atlas with LRU eviction per ADR-004
 - 1.C.3 Frame pacing controller respecting backpressure
 - 1.C.4 Renderer device-loss recovery (DXGI device-removed)
 - 1.C.5 VRAM ceiling enforcement
@@ -157,7 +184,7 @@ Gates: spec §6.1 #15, #24.
 
 ---
 
-## PHASE 3 — Developer-UX *(outline; re-plan before execution)*
+## PHASE 3 — Developer UX *(outline; re-plan before execution)*
 
 Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
@@ -215,7 +242,7 @@ Gates: spec §6.1 #16, #19, #23, #31.
 Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 
 - 5.A.1 UIA provider over BongT terminal surface (Narrator reads active text / scrollback / blocks / tabs / panes / main controls)
-- 5.A.2 IME composition wired to ADR-004a/b shape
+- 5.A.2 IME composition wired to ADR-005/006 shape
 - 5.A.3 Per-monitor DPI v2 + live DPI changes
 - 5.B.1 MSIX manifest in `packaging/msix/`
 - 5.B.2 `xtask package-msix` real impl
@@ -230,10 +257,10 @@ Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 - 5.D.1 Diagnostic export flow with redaction preview
 - 5.D.2 Telemetry consent flow (off by default)
 - 5.D.3 `bongterm-diagnostics` minidump capture full impl
-- 5.E.1 **S5** Claude Code non-interactive output reliability across last 3 versions → ADR-006
-- 5.E.2 **S6** Codex CLI auth flow end-to-end → ADR-007
-- 5.E.3 **S7** Defender + EDR-friendly process supervision smoke → ADR-008 + security whitepaper
-- 5.E.4 **S8** Prompt-injection corpus expanded → ADR-009
+- 5.E.1 **S5** Claude Code non-interactive output reliability across last 3 versions → ADR (Wave 1)
+- 5.E.2 **S6** Codex CLI auth flow end-to-end → ADR (Wave 1)
+- 5.E.3 **S7** Defender + EDR-friendly process supervision smoke → ADR (Wave 1) + security whitepaper
+- 5.E.4 **S8** Prompt-injection corpus expanded → ADR (Wave 1)
 - 5.F.1 SBOM tooling decision (cargo-cyclonedx vs custom) + production impl
 - 5.F.2 Provenance attestation (`attestation.intoto.jsonl`)
 - 5.F.3 `known-issues.md` published
@@ -265,4 +292,4 @@ Gates: spec §6.1 #22 + §6.6 ship-when checklist.
 
 ---
 
-*End of orca.md. Tasks above are removed in-place when complete. Detailed TDD steps for Phase 0 in `docs/superpowers/plans/2026-05-27-bongt-mvp0.md`.*
+*End of orca.md. Tasks are removed in-place when complete. Git history is the audit trail.*
