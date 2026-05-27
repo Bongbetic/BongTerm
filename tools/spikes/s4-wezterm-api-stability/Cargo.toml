@@ -1,0 +1,16 @@
+[package]
+name = "s4-wezterm-api-stability"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+# Spike S4: wezterm-term / wezterm-mux / termwiz API stability survey.
+# Runs after submodule is initialized (git submodule update --init).
+# Harness: reads submodule git log + produces API churn report.
+# Exit artifact: docs/adr/0007-wezterm-submodule.md
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

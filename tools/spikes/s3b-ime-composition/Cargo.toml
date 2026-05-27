@@ -1,0 +1,20 @@
+[package]
+name = "s3b-ime-composition"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+# Spike S3b: IME composition (CJK Pinyin) on the integration shape from ADR-005.
+# Runs after S3a. Tests: compose/cancel/commit, surrogate pairs, grapheme clusters.
+# Harness code (src/main.rs) written after ADR-005 accepted.
+# Exit artifact: docs/adr/0006-ime-composition.md
+
+[dependencies]
+anyhow = { workspace = true }
+wgpu = { workspace = true }
+iced = { workspace = true }
+windows = { workspace = true }
+bongterm-term = { path = "../../../crates/bongterm-term" }
+bongterm-render = { path = "../../../crates/bongterm-render" }
+tokio = { workspace = true }

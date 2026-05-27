@@ -22,6 +22,12 @@ members = [
     "crates/bongterm-diagnostics",
     "crates/bongterm-test-kit",
     "tools/xtask",
+    # Wave 0 spike harnesses — deleted after their ADR is accepted.
+    "tools/spikes/s1-renderer-latency",
+    "tools/spikes/s2-vram-eviction",
+    "tools/spikes/s3a-device-integration",
+    "tools/spikes/s3b-ime-composition",
+    "tools/spikes/s4-wezterm-api-stability",
 ]
 
 [workspace.package]

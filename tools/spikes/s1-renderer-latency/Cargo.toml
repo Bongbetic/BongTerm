@@ -1,0 +1,21 @@
+[package]
+name = "s1-renderer-latency"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+# Spike S1: wgpu + glyphon keystroke-to-glyph latency measurement.
+# Harness code (src/main.rs) written when Rust + wgpu are available.
+# Exit artifact: docs/adr/0003-wgpu-glyphon-latency.md
+
+[dependencies]
+anyhow = { workspace = true }
+wgpu = { workspace = true }
+glyphon = { workspace = true }
+winit = "0.30"
+bongterm-term = { path = "../../../crates/bongterm-term" }
+bongterm-render = { path = "../../../crates/bongterm-render" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
