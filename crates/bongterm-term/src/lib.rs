@@ -179,6 +179,12 @@ impl TerminalSession for MockTerminalSession {
     }
 }
 
+pub mod surface;
+pub use surface::{CellPosition, CellRun, CursorState, CursorStyle, DirtyRegion, SurfaceSnapshot};
+
+pub mod adapter;
+pub use adapter::WezTermAdapter;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
