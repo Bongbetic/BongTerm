@@ -1,0 +1,3 @@
+msrv = "1.95"
+avoid-breaking-exported-api = false
+# Tighten clippy a bit on the hot-path crates via lints in their Cargo.toml.
