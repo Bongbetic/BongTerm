@@ -7,5 +7,4 @@ license.workspace = true
 publish = false
 
 [dependencies]
-
-[dev-dependencies]
+bongterm-diagnostics = { path = "../bongterm-diagnostics" }

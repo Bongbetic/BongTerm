@@ -1,5 +1,6 @@
-//! BongTerm application binary entrypoint.
+//! `BongTerm` application binary entrypoint.
 
 fn main() {
-    println!("BongTerm 0.0.0-dev — scaffold; nothing useful yet. See docs/PRD/.");
+    bongterm_diagnostics::install_panic_hook();
+    println!("BongTerm 0.0.0-dev — scaffold; nothing useful yet.");
 }
