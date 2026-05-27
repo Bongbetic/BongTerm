@@ -1,0 +1,87 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bongterm-app",
+    "crates/bongterm-ui",
+    "crates/bongterm-render",
+    "crates/bongterm-term",
+    "crates/bongterm-pty",
+    "crates/bongterm-mux",
+    "crates/bongterm-blocks",
+    "crates/bongterm-agents",
+    "crates/bongterm-mcp",
+    "crates/bongterm-ledger",
+    "crates/bongterm-process-control",
+    "crates/bongterm-secrets-api",
+    "crates/bongterm-vault-windows",
+    "crates/bongterm-security",
+    "crates/bongterm-storage-api",
+    "crates/bongterm-storage-sqlite",
+    "crates/bongterm-settings",
+    "crates/bongterm-devassist",
+    "crates/bongterm-diagnostics",
+    "crates/bongterm-test-kit",
+    "tools/xtask",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.95"
+license = "Apache-2.0"
+repository = "https://github.com/PLACEHOLDER-USER/bongterm"
+authors = ["BongTerm contributors"]
+
+[workspace.dependencies]
+# External pins:
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+json5 = "0.4"
+thiserror = "2"
+anyhow = "1"
+camino = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+parking_lot = "0.12"
+arc-swap = "1"
+dashmap = "6"
+schemars = "0.8"
+blake3 = "1"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Credentials",
+    "Win32_Security_Cryptography",
+    "Win32_System_Console",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Direct3D12",
+] }
+rusqlite = { version = "0.32", features = ["bundled", "blob", "backup"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1"
+arbitrary = { version = "1", features = ["derive"] }
+insta = { version = "1", features = ["yaml", "redactions"] }
+# Renderer + UI (Phase 0 scaffold pulls these in for compilation; product use begins after ADR-002+):
+wgpu = "0.20"
+glyphon = "0.6"
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio"] }
+# Diagnostics:
+minidump-writer = "0.10"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+# Do NOT set panic = "abort" — see spec §2.3 + §4 panic isolation contract.
+
+[profile.dev]
+debug = 1
+
+[profile.bench]
+debug = true
