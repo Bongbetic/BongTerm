@@ -1,0 +1,33 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local diagnostics
+*.dmp
+crashes/
+dogfood/private/
+
+# Generated / secrets
+*.env.local
+*.bak.*
+chunks/
+secrets/*.json
+!secrets/.gitkeep
+
+# Build artifacts
+target/
+dist/
+*.msix
+*.cer
+*.appx
