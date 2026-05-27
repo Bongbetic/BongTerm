@@ -1,0 +1,82 @@
+# Allowed inter-crate edges in the BongTerm workspace.
+# `cargo xtask check-deps` enforces this list. The format is:
+#   [bongterm-x]
+#   allowed = ["bongterm-a", "bongterm-b"]
+#
+# A dependency edge that does not appear here fails CI.
+
+[bongterm-app]
+allowed = [
+    "bongterm-ui", "bongterm-render", "bongterm-term", "bongterm-pty",
+    "bongterm-mux", "bongterm-blocks", "bongterm-agents", "bongterm-mcp",
+    "bongterm-ledger", "bongterm-process-control", "bongterm-secrets-api",
+    "bongterm-vault-windows", "bongterm-security", "bongterm-storage-api",
+    "bongterm-storage-sqlite", "bongterm-settings", "bongterm-devassist",
+    "bongterm-diagnostics",
+]
+
+[bongterm-ui]
+allowed = ["bongterm-settings", "bongterm-secrets-api", "bongterm-storage-api", "bongterm-render"]
+
+[bongterm-render]
+# Renderer must NOT import wezterm-term / termwiz directly.
+allowed = ["bongterm-term"]
+
+[bongterm-term]
+# Adapter over wezterm-term + termwiz; owns SurfaceSnapshot etc.
+allowed = []  # vendored wezterm-term + termwiz are external (path deps), tracked separately.
+
+[bongterm-pty]
+allowed = []
+
+[bongterm-mux]
+allowed = ["bongterm-pty", "bongterm-term"]
+
+[bongterm-blocks]
+allowed = ["bongterm-term"]
+
+[bongterm-agents]
+allowed = ["bongterm-pty", "bongterm-secrets-api", "bongterm-mcp", "bongterm-security", "bongterm-storage-api", "bongterm-ledger", "bongterm-process-control"]
+
+[bongterm-mcp]
+allowed = ["bongterm-secrets-api", "bongterm-security", "bongterm-ledger", "bongterm-process-control", "bongterm-storage-api"]
+
+[bongterm-ledger]
+allowed = ["bongterm-storage-api"]
+
+[bongterm-process-control]
+allowed = ["bongterm-ledger", "bongterm-security"]
+
+[bongterm-secrets-api]
+allowed = []
+
+[bongterm-vault-windows]
+allowed = ["bongterm-secrets-api"]
+
+[bongterm-security]
+allowed = ["bongterm-secrets-api", "bongterm-settings"]
+
+[bongterm-storage-api]
+allowed = []
+
+[bongterm-storage-sqlite]
+allowed = ["bongterm-storage-api"]
+
+[bongterm-settings]
+allowed = []
+
+[bongterm-devassist]
+# Cmd-K, explainer, history, snippets, jobs, patterns.
+allowed = ["bongterm-agents", "bongterm-blocks", "bongterm-pty", "bongterm-ledger", "bongterm-storage-api", "bongterm-secrets-api"]
+
+[bongterm-diagnostics]
+allowed = ["bongterm-storage-api", "bongterm-security"]
+
+[bongterm-test-kit]
+# Test kit can depend on every trait crate so it can build mocks + conformance suites.
+allowed = [
+    "bongterm-term", "bongterm-render", "bongterm-pty", "bongterm-mux",
+    "bongterm-blocks", "bongterm-agents", "bongterm-mcp", "bongterm-ledger",
+    "bongterm-process-control", "bongterm-secrets-api", "bongterm-security",
+    "bongterm-storage-api", "bongterm-settings",
+]
