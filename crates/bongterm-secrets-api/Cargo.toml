@@ -7,5 +7,5 @@ license.workspace = true
 publish = false
 
 [dependencies]
-
-[dev-dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
