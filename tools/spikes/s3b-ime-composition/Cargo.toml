@@ -6,16 +6,13 @@ rust-version.workspace = true
 publish = false
 license.workspace = true
 
-# Spike S3b: IME composition (CJK Pinyin) on the integration shape from ADR-005.
-# Runs after S3a. Tests: compose/cancel/commit, surrogate pairs, grapheme clusters.
-# Harness code (src/main.rs) written after ADR-005 accepted.
+# Spike S3b: IME composition (CJK Pinyin) on the Iced Shader widget single-HWND shape (ADR-005).
+# Tests: compose/cancel/commit, surrogate pairs, ImmSetCompositionWindow positioning.
 # Exit artifact: docs/adr/0006-ime-composition.md
 
 [dependencies]
-anyhow = { workspace = true }
-wgpu = { workspace = true }
 iced = { workspace = true }
 windows = { workspace = true }
-bongterm-term = { path = "../../../crates/bongterm-term" }
-bongterm-render = { path = "../../../crates/bongterm-render" }
+anyhow = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }

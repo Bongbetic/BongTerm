@@ -67,6 +67,7 @@ windows = { version = "0.58", features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Direct3D12",
+    "Win32_UI_Input_Ime",
 ] }
 rusqlite = { version = "0.32", features = ["bundled", "blob", "backup"] }
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -76,7 +77,7 @@ insta = { version = "1", features = ["yaml", "redactions"] }
 # Renderer + UI (Phase 0 scaffold pulls these in for compilation; product use begins after ADR-002+):
 wgpu = "0.20"
 glyphon = "0.6"
-iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio"] }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio", "advanced"] }
 # Diagnostics:
 minidump-writer = "0.10"
 
