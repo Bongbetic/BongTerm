@@ -1,7 +1,7 @@
 //! `cargo xtask check-deps` — validate workspace inter-crate dependency graph
 //! against `tools/xtask/allowed-deps.toml`.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -14,8 +14,8 @@ struct AllowedEntry {
 pub fn run() -> Result<()> {
     let manifest = std::fs::read_to_string("tools/xtask/allowed-deps.toml")
         .context("read allowed-deps.toml")?;
-    let allowed: BTreeMap<String, AllowedEntry> = toml::from_str(&manifest)
-        .context("parse allowed-deps.toml")?;
+    let allowed: BTreeMap<String, AllowedEntry> =
+        toml::from_str(&manifest).context("parse allowed-deps.toml")?;
 
     let crates_dir = Path::new("crates");
     let mut violations = vec![];
@@ -32,10 +32,10 @@ pub fn run() -> Result<()> {
             continue;
         }
 
-        let contents = std::fs::read_to_string(&cargo_toml)
-            .with_context(|| format!("read {cargo_toml:?}"))?;
-        let parsed: toml::Value = toml::from_str(&contents)
-            .with_context(|| format!("parse {cargo_toml:?}"))?;
+        let contents =
+            std::fs::read_to_string(&cargo_toml).with_context(|| format!("read {cargo_toml:?}"))?;
+        let parsed: toml::Value =
+            toml::from_str(&contents).with_context(|| format!("parse {cargo_toml:?}"))?;
 
         let mut actual_deps: Vec<String> = vec![];
         for table_key in ["dependencies", "dev-dependencies", "build-dependencies"] {

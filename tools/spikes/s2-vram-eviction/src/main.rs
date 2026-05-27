@@ -16,8 +16,8 @@ use wgpu::{
     PowerPreference, RequestAdapterOptionsBase,
 };
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIAdapter3, IDXGIFactory4, DXGI_MEMORY_SEGMENT_GROUP_LOCAL,
-    DXGI_QUERY_VIDEO_MEMORY_INFO,
+    CreateDXGIFactory1, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, DXGI_QUERY_VIDEO_MEMORY_INFO,
+    IDXGIAdapter3, IDXGIFactory4,
 };
 // `Interface::cast` is required to QI IDXGIAdapter1 → IDXGIAdapter3.
 use windows::core::Interface;
@@ -144,7 +144,13 @@ async fn main() -> Result<()> {
 
     // Non-zero resolution so prepare() doesn't trivially skip glyph rasterization.
     // "Virtual" 1920×1080 surface — no actual framebuffer exists.
-    viewport.update(&queue, Resolution { width: 1920, height: 1080 });
+    viewport.update(
+        &queue,
+        Resolution {
+            width: 1920,
+            height: 1080,
+        },
+    );
 
     let mut atlas = TextAtlas::new(&device, &queue, &cache, surface_format);
     let mut text_renderer =
@@ -193,8 +199,7 @@ async fn main() -> Result<()> {
     println!();
 
     // Upload each pane's glyphs to the shared atlas via prepare().
-    for p in 0..4usize {
-        let (font_system, swash_cache, buf, _) = &mut pane_data[p];
+    for (p, (font_system, swash_cache, buf, _)) in pane_data.iter_mut().enumerate() {
         let text_area = TextArea {
             buffer: buf,
             left: 0.0,
@@ -239,14 +244,12 @@ async fn main() -> Result<()> {
     //    The DXGI delta (below) is the ground-truth measurement.
     // ------------------------------------------------------------------
     let est_side: u32 = 512;
-    let est_mask_kb = est_side * est_side * 1 / 1024;
+    let est_mask_kb = est_side * est_side / 1024;
     let est_color_kb = est_side * est_side * 4 / 1024;
     let est_total_kb = est_mask_kb + est_color_kb;
     println!(
         "Estimated atlas texture: mask {}×{} ({} KB) + color {}×{} ({} KB) = ~{} KB total",
-        est_side, est_side, est_mask_kb,
-        est_side, est_side, est_color_kb,
-        est_total_kb,
+        est_side, est_side, est_mask_kb, est_side, est_side, est_color_kb, est_total_kb,
     );
     println!();
 
@@ -329,9 +332,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    println!(
-        "trim() completed. glyphs_in_use cleared. Next prepare() overflow → LRU eviction."
-    );
+    println!("trim() completed. glyphs_in_use cleared. Next prepare() overflow → LRU eviction.");
     println!();
     println!("=== S2 Complete ===");
     println!("Exit artifact: docs/adr/0004-atlas-eviction.md");

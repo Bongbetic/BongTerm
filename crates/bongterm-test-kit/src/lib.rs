@@ -133,7 +133,11 @@ mod tests {
 
     #[test]
     fn data_loss_risk_display_does_not_panic() {
-        let variants = [DataLossRisk::None, DataLossRisk::Recoverable, DataLossRisk::Permanent];
+        let variants = [
+            DataLossRisk::None,
+            DataLossRisk::Recoverable,
+            DataLossRisk::Permanent,
+        ];
         for v in &variants {
             let s = format!("{v}");
             assert!(!s.is_empty(), "Display for {v:?} returned empty string");
@@ -149,7 +153,10 @@ mod tests {
         ];
         for v in &variants {
             let s = format!("{v}");
-            assert!(!s.is_empty(), "Display for EnforcementLevel::{v:?} returned empty string");
+            assert!(
+                !s.is_empty(),
+                "Display for EnforcementLevel::{v:?} returned empty string"
+            );
         }
     }
 
@@ -173,7 +180,13 @@ mod tests {
     #[test]
     fn bongt_error_class_matches() {
         assert_eq!(BongtError::Io("err".to_string()).class(), ErrorClass::Io);
-        assert_eq!(BongtError::Auth("err".to_string()).class(), ErrorClass::Auth);
-        assert_eq!(BongtError::Internal("err".to_string()).class(), ErrorClass::Internal);
+        assert_eq!(
+            BongtError::Auth("err".to_string()).class(),
+            ErrorClass::Auth
+        );
+        assert_eq!(
+            BongtError::Internal("err".to_string()).class(),
+            ErrorClass::Internal
+        );
     }
 }

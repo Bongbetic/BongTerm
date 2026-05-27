@@ -83,7 +83,11 @@ pub trait ProcessGovernor: Send + Sync {
     fn sample_rss(&self, handle: ProcessHandle) -> Result<u64, GovernorError>;
 
     /// Terminate a process via the governor.
-    fn terminate(&self, handle: ProcessHandle, reason: TerminationReason) -> Result<(), GovernorError>;
+    fn terminate(
+        &self,
+        handle: ProcessHandle,
+        reason: TerminationReason,
+    ) -> Result<(), GovernorError>;
 }
 
 /// Port interface for pre-flight admission control before launching a process.
@@ -104,7 +108,9 @@ impl MockProcessGovernor {
     /// Create a new empty mock governor.
     #[must_use]
     pub fn new() -> Self {
-        Self { attached: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            attached: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     /// Returns the caps recorded for a process, or None.
@@ -119,7 +125,9 @@ impl MockProcessGovernor {
 }
 
 impl Default for MockProcessGovernor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProcessGovernor for MockProcessGovernor {
@@ -146,7 +154,11 @@ impl ProcessGovernor for MockProcessGovernor {
         }
     }
 
-    fn terminate(&self, handle: ProcessHandle, _reason: TerminationReason) -> Result<(), GovernorError> {
+    fn terminate(
+        &self,
+        handle: ProcessHandle,
+        _reason: TerminationReason,
+    ) -> Result<(), GovernorError> {
         if self.attached.lock().unwrap().remove(&handle).is_some() {
             Ok(())
         } else {
@@ -163,11 +175,17 @@ pub struct MockAdmissionController {
 impl MockAdmissionController {
     /// Returns a controller that admits every request.
     #[must_use]
-    pub fn permissive() -> Self { Self { always_admit: true } }
+    pub fn permissive() -> Self {
+        Self { always_admit: true }
+    }
 
     /// Returns a controller that rejects every request.
     #[must_use]
-    pub fn restrictive() -> Self { Self { always_admit: false } }
+    pub fn restrictive() -> Self {
+        Self {
+            always_admit: false,
+        }
+    }
 }
 
 impl AdmissionController for MockAdmissionController {
@@ -175,7 +193,9 @@ impl AdmissionController for MockAdmissionController {
         if self.always_admit {
             AdmissionVerdict::Admit { caps: requested }
         } else {
-            AdmissionVerdict::Reject { reason: "mock: over budget".to_string() }
+            AdmissionVerdict::Reject {
+                reason: "mock: over budget".to_string(),
+            }
         }
     }
 }
@@ -188,7 +208,11 @@ mod tests {
     fn mock_attach_records_caps() {
         let gov = MockProcessGovernor::new();
         let handle = ProcessHandle(1234);
-        let caps = JobObjectCaps { rss_bytes: 512 * 1024 * 1024, cpu_rate_bps: 5000, child_proc_count: 4 };
+        let caps = JobObjectCaps {
+            rss_bytes: 512 * 1024 * 1024,
+            cpu_rate_bps: 5000,
+            child_proc_count: 4,
+        };
         gov.attach(handle, caps).unwrap();
         assert_eq!(gov.caps_for(handle), Some(caps));
     }
@@ -197,8 +221,16 @@ mod tests {
     fn mock_update_caps() {
         let gov = MockProcessGovernor::new();
         let handle = ProcessHandle(42);
-        let initial = JobObjectCaps { rss_bytes: 100, cpu_rate_bps: 1000, child_proc_count: 2 };
-        let updated = JobObjectCaps { rss_bytes: 200, cpu_rate_bps: 2000, child_proc_count: 4 };
+        let initial = JobObjectCaps {
+            rss_bytes: 100,
+            cpu_rate_bps: 1000,
+            child_proc_count: 2,
+        };
+        let updated = JobObjectCaps {
+            rss_bytes: 200,
+            cpu_rate_bps: 2000,
+            child_proc_count: 4,
+        };
         gov.attach(handle, initial).unwrap();
         gov.update_caps(handle, updated).unwrap();
         assert_eq!(gov.caps_for(handle), Some(updated));
@@ -207,21 +239,31 @@ mod tests {
     #[test]
     fn update_untracked_errors() {
         let gov = MockProcessGovernor::new();
-        let err = gov.update_caps(ProcessHandle(999), JobObjectCaps::UNLIMITED).unwrap_err();
+        let err = gov
+            .update_caps(ProcessHandle(999), JobObjectCaps::UNLIMITED)
+            .unwrap_err();
         assert!(matches!(err, GovernorError::NotTracked(_)));
     }
 
     #[test]
     fn permissive_admission_admits() {
         let ac = MockAdmissionController::permissive();
-        let caps = JobObjectCaps { rss_bytes: 1024, cpu_rate_bps: 100, child_proc_count: 1 };
+        let caps = JobObjectCaps {
+            rss_bytes: 1024,
+            cpu_rate_bps: 100,
+            child_proc_count: 1,
+        };
         assert!(matches!(ac.admit(caps), AdmissionVerdict::Admit { .. }));
     }
 
     #[test]
     fn restrictive_admission_rejects() {
         let ac = MockAdmissionController::restrictive();
-        let caps = JobObjectCaps { rss_bytes: 1024, cpu_rate_bps: 100, child_proc_count: 1 };
+        let caps = JobObjectCaps {
+            rss_bytes: 1024,
+            cpu_rate_bps: 100,
+            child_proc_count: 1,
+        };
         assert!(matches!(ac.admit(caps), AdmissionVerdict::Reject { .. }));
     }
 }

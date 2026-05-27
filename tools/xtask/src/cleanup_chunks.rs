@@ -1,6 +1,6 @@
 //! Stub. Implemented in Phase 1.G.4; see plan §1.G.4.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 pub fn run() -> Result<()> {
     Err(anyhow!("cleanup-chunks not yet implemented (Phase 1.G.4)"))

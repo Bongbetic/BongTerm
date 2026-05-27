@@ -32,7 +32,7 @@ use winit::{
 const CELL_W: u32 = 8;
 const CELL_H: u32 = 16;
 const WIN_W: u32 = 120 * CELL_W; // 960
-const WIN_H: u32 = 40 * CELL_H;  // 640
+const WIN_H: u32 = 40 * CELL_H; // 640
 
 // Measurement grid for the glyph load: 80 cols x 24 rows of 'A'
 const GLYPH_COLS: usize = 80;
@@ -102,11 +102,7 @@ impl App {
         let attrs = Window::default_attributes()
             .with_title("S1 – keystroke-to-glyph latency spike")
             .with_inner_size(winit::dpi::PhysicalSize::new(WIN_W, WIN_H));
-        let window = Arc::new(
-            event_loop
-                .create_window(attrs)
-                .context("create window")?,
-        );
+        let window = Arc::new(event_loop.create_window(attrs).context("create window")?);
 
         // --- wgpu instance + surface ---
         let instance = Instance::new(InstanceDescriptor::default());
@@ -154,10 +150,7 @@ impl App {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
 
-        let present_mode = if surface_caps
-            .present_modes
-            .contains(&PresentMode::Immediate)
-        {
+        let present_mode = if surface_caps.present_modes.contains(&PresentMode::Immediate) {
             PresentMode::Immediate
         } else {
             PresentMode::AutoNoVsync
@@ -179,12 +172,8 @@ impl App {
         let cache = Cache::new(&device);
         let viewport = Viewport::new(&device, &cache);
         let mut atlas = TextAtlas::new(&device, &queue, &cache, surface_format);
-        let text_renderer = TextRenderer::new(
-            &mut atlas,
-            &device,
-            wgpu::MultisampleState::default(),
-            None,
-        );
+        let text_renderer =
+            TextRenderer::new(&mut atlas, &device, wgpu::MultisampleState::default(), None);
 
         let mut font_system = FontSystem::new();
         let swash_cache = SwashCache::new();
@@ -197,8 +186,7 @@ impl App {
 
         let text: String = {
             let row: String = "A".repeat(GLYPH_COLS);
-            std::iter::repeat(row)
-                .take(GLYPH_ROWS)
+            std::iter::repeat_n(row, GLYPH_ROWS)
                 .collect::<Vec<_>>()
                 .join("\n")
         };
@@ -244,8 +232,7 @@ impl App {
         let ch = char::from_u32(b'A' as u32 + (s.glyph_counter % 26) as u32).unwrap_or('A');
         let text: String = {
             let row: String = ch.to_string().repeat(GLYPH_COLS);
-            std::iter::repeat(row)
-                .take(GLYPH_ROWS)
+            std::iter::repeat_n(row, GLYPH_ROWS)
                 .collect::<Vec<_>>()
                 .join("\n")
         };
@@ -307,11 +294,9 @@ impl App {
             .expect("glyphon prepare");
 
         // Encoder + render pass
-        let mut encoder =
-            s.device
-                .create_command_encoder(&CommandEncoderDescriptor {
-                    label: Some("s1-encoder"),
-                });
+        let mut encoder = s.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("s1-encoder"),
+        });
         {
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("s1-render-pass"),
@@ -352,7 +337,7 @@ impl App {
         self.samples.push(elapsed_us);
 
         let n = self.samples.len();
-        if n % 20 == 0 {
+        if n.is_multiple_of(20) {
             info!("Sample {}/{}: {} µs", n, MAX_SAMPLES, elapsed_us);
         }
 

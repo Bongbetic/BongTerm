@@ -12,17 +12,16 @@
 #![allow(clippy::pedantic)]
 
 use iced::event::Event;
+use iced::mouse;
 use iced::widget::shader::{self, Shader};
 use iced::widget::{column, text};
 use iced::{Element, Fill, Length, Rectangle, Subscription, Task};
-use iced::mouse;
 
 // ─── windows-rs IMM32 imports ────────────────────────────────────────────────
 
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::UI::Input::Ime::{
-    ImmGetContext, ImmReleaseContext, ImmSetCompositionWindow,
-    COMPOSITIONFORM, CFS_POINT,
+    CFS_POINT, COMPOSITIONFORM, ImmGetContext, ImmReleaseContext, ImmSetCompositionWindow,
 };
 
 // ─── Simulated cursor geometry ───────────────────────────────────────────────
@@ -62,7 +61,9 @@ fn position_candidate_window(hwnd: HWND) -> bool {
     unsafe {
         let himc = ImmGetContext(hwnd);
         if himc.is_invalid() {
-            println!("SPIKE FINDING: ImmGetContext returned null HIMC — IME may not be active for this window.");
+            println!(
+                "SPIKE FINDING: ImmGetContext returned null HIMC — IME may not be active for this window."
+            );
             return false;
         }
         let pos = cursor_pixel_pos();
@@ -79,8 +80,10 @@ fn position_candidate_window(hwnd: HWND) -> bool {
                 CURSOR_COL, CURSOR_ROW, pos.x, pos.y
             );
         } else {
-            println!("SPIKE FINDING: ImmSetCompositionWindow failed (BOOL=false). \
-                      Possible cause: IME not active, or HWND belongs to a different thread.");
+            println!(
+                "SPIKE FINDING: ImmSetCompositionWindow failed (BOOL=false). \
+                      Possible cause: IME not active, or HWND belongs to a different thread."
+            );
         }
         ok.as_bool()
     }
@@ -146,9 +149,19 @@ impl shader::Primitive for TerminalQuad {
     ) {
         // Dark terminal background; cursor shown as slightly brighter cell.
         let bg = if self.show_cursor {
-            iced::wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 }
+            iced::wgpu::Color {
+                r: 0.1,
+                g: 0.1,
+                b: 0.15,
+                a: 1.0,
+            }
         } else {
-            iced::wgpu::Color { r: 0.08, g: 0.08, b: 0.12, a: 1.0 }
+            iced::wgpu::Color {
+                r: 0.08,
+                g: 0.08,
+                b: 0.12,
+                a: 1.0,
+            }
         };
         let _pass = encoder.begin_render_pass(&iced::wgpu::RenderPassDescriptor {
             label: Some("s3b-terminal-bg"),
@@ -196,7 +209,9 @@ impl shader::Program<Message> for TerminalShaderProgram {
         _cursor: mouse::Cursor,
         _bounds: Rectangle,
     ) -> Self::Primitive {
-        TerminalQuad { show_cursor: self.show_cursor }
+        TerminalQuad {
+            show_cursor: self.show_cursor,
+        }
     }
 }
 
@@ -250,7 +265,9 @@ fn update(state: &mut AppState, msg: Message) -> Task<Message> {
                 let hwnd = HWND(raw_val as isize as *mut std::ffi::c_void);
                 state.imm_set_ok = position_candidate_window(hwnd);
             } else {
-                println!("SPIKE FINDING: HwndResolved(None) — not a Win32 window or window::run returned before window was ready.");
+                println!(
+                    "SPIKE FINDING: HwndResolved(None) — not a Win32 window or window::run returned before window was ready."
+                );
             }
             Task::none()
         }
@@ -335,24 +352,31 @@ fn view(state: &AppState) -> Element<'_, Message> {
 
     let preedit_label = text(format!(
         "Composition: {}",
-        if state.composition.is_empty() { "(none)" } else { &state.composition }
+        if state.composition.is_empty() {
+            "(none)"
+        } else {
+            &state.composition
+        }
     ))
     .size(18);
 
     let committed_label = text(format!(
         "Committed: {}",
-        if state.committed.is_empty() { "(none yet)" } else { &state.committed }
+        if state.committed.is_empty() {
+            "(none yet)"
+        } else {
+            &state.committed
+        }
     ))
     .size(18);
 
-    let instructions = text(
-        "Enable a CJK IME (e.g. Chinese Simplified), type to begin composition."
-    )
-    .size(14);
+    let instructions =
+        text("Enable a CJK IME (e.g. Chinese Simplified), type to begin composition.").size(14);
 
     let hwnd_label = text(format!(
         "HWND: {}",
-        state.hwnd_raw
+        state
+            .hwnd_raw
             .map(|v| format!("0x{:X}", v))
             .unwrap_or_else(|| "resolving…".to_owned())
     ))
@@ -382,8 +406,7 @@ fn subscription(_state: &AppState) -> Subscription<Message> {
         _ => None,
     });
 
-    let tick_sub = iced::time::every(std::time::Duration::from_millis(500))
-        .map(|_| Message::Tick);
+    let tick_sub = iced::time::every(std::time::Duration::from_millis(500)).map(|_| Message::Tick);
 
     Subscription::batch([ime_sub, tick_sub])
 }
@@ -410,12 +433,11 @@ fn main() -> iced::Result {
         // is None only if no window has opened yet (unlikely at init but handled).
         // Use `.then(|opt| ...)` to branch: for Some(id) chain into raw_id,
         // for None produce HwndResolved(None).
-        let hwnd_task = iced::window::latest().then(|maybe_id| {
-            match maybe_id {
-                Some(id) => iced::window::raw_id::<Message>(id)
-                    .map(|raw| Message::HwndResolved(Some(raw))),
-                None => Task::done(Message::HwndResolved(None)),
+        let hwnd_task = iced::window::latest().then(|maybe_id| match maybe_id {
+            Some(id) => {
+                iced::window::raw_id::<Message>(id).map(|raw| Message::HwndResolved(Some(raw)))
             }
+            None => Task::done(Message::HwndResolved(None)),
         });
         (AppState::default(), hwnd_task)
     }
@@ -429,27 +451,51 @@ fn main() -> iced::Result {
     println!();
     match &result {
         Ok(()) => {
-            println!("S3b result: IME composition approach WORKS (manual verification needed for live CJK input)");
+            println!(
+                "S3b result: IME composition approach WORKS (manual verification needed for live CJK input)"
+            );
         }
         Err(e) => {
             println!("S3b result: FAILS: {e:?}");
         }
     }
     println!("  ImmSetCompositionWindow: will be reported per-run above (requires active CJK IME)");
-    println!("  Surrogate pairs: Iced/winit deliver Commit as a Rust String — UTF-16 surrogates are");
-    println!("    merged transparently in winit's WM_IME_COMPOSITION handler before iced sees the text.");
-    println!("    The spike never receives raw UTF-16 surrogates; full Unicode chars arrive in Commit.");
+    println!(
+        "  Surrogate pairs: Iced/winit deliver Commit as a Rust String — UTF-16 surrogates are"
+    );
+    println!(
+        "    merged transparently in winit's WM_IME_COMPOSITION handler before iced sees the text."
+    );
+    println!(
+        "    The spike never receives raw UTF-16 surrogates; full Unicode chars arrive in Commit."
+    );
     println!();
     println!("  SPIKE FINDINGs summary:");
-    println!("  1. Iced 0.14 IME events: Event::InputMethod(input_method::Event::{{Opened,Preedit,Commit,Closed}})");
+    println!(
+        "  1. Iced 0.14 IME events: Event::InputMethod(input_method::Event::{{Opened,Preedit,Commit,Closed}})"
+    );
     println!("     NOT WindowEvent::Ime — that is winit-internal, not iced public API.");
-    println!("  2. WM_IME_COMPOSITION / WM_IME_STARTCOMPOSITION are abstracted by winit; iced never");
-    println!("     sees raw IME Win32 messages. DefWindowProc for unhandled IME messages is called by winit.");
-    println!("  3. ImmSetCompositionWindow requires the HWND — obtainable via window::raw_id() Task.");
-    println!("     No synchronous HWND getter in iced's public API; must defer until Task resolves.");
-    println!("  4. event::listen_raw needed to observe InputMethod events at app level; listen() misses");
-    println!("     events captured by focused widgets. Terminal widget should handle them in Widget::update.");
-    println!("  5. Shader widget and IME event dispatch are fully orthogonal — no interference observed.");
+    println!(
+        "  2. WM_IME_COMPOSITION / WM_IME_STARTCOMPOSITION are abstracted by winit; iced never"
+    );
+    println!(
+        "     sees raw IME Win32 messages. DefWindowProc for unhandled IME messages is called by winit."
+    );
+    println!(
+        "  3. ImmSetCompositionWindow requires the HWND — obtainable via window::raw_id() Task."
+    );
+    println!(
+        "     No synchronous HWND getter in iced's public API; must defer until Task resolves."
+    );
+    println!(
+        "  4. event::listen_raw needed to observe InputMethod events at app level; listen() misses"
+    );
+    println!(
+        "     events captured by focused widgets. Terminal widget should handle them in Widget::update."
+    );
+    println!(
+        "  5. Shader widget and IME event dispatch are fully orthogonal — no interference observed."
+    );
 
     result
 }

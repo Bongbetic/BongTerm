@@ -5,7 +5,7 @@
 //! Phase 1 task 1.B.3. CI gate uses these as lower-bound regression guards.
 
 use bongterm_term::WezTermAdapter;
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 fn payload(mb: usize) -> Vec<u8> {
     let mut v = Vec::with_capacity(mb * 1024 * 1024);

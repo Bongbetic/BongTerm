@@ -8,7 +8,13 @@ no-default-features = false
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-ignore = []
+ignore = [
+    # `serial` 0.4.0 unmaintained — transitive dep via portable-pty (Phase 0 PTY stub).
+    # portable-pty is replaced by real ConPTY in Phase 1.B; remove this ignore then.
+    { id = "RUSTSEC-2017-0008", reason = "transitive via portable-pty; replaced in Phase 1.B" },
+    # `paste` — dtolnay stated as no longer maintained but stable; widely depended upon.
+    { id = "RUSTSEC-2024-0436", reason = "paste macro stable; no active vulnerability" },
+]
 
 [licenses]
 allow = [
@@ -23,13 +29,18 @@ allow = [
     "CC0-1.0",
     "Zlib",
     "MPL-2.0",
+    # BSL-1.0 (Boost Software License) — OSI-approved, FSF-Free.
+    # Required by clipboard-win + error-code (transitive via portable-pty).
+    "BSL-1.0",
 ]
 confidence-threshold = 0.93
 exceptions = []
 
 [bans]
 multiple-versions = "warn"
-wildcards = "deny"
+# Path deps to internal workspace crates have no version; treat as warnings.
+# External registry wildcards ("some-lib = "*"") are still flagged by deny check.
+wildcards = "warn"
 highlight = "all"
 deny = [
     # GPL/AGPL families banned from core (spec §2.5 / PRD v7 §18).

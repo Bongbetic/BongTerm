@@ -26,7 +26,9 @@ impl MockBlockRepo {
     /// Create a new empty [`MockBlockRepo`].
     #[must_use]
     pub fn new() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -62,7 +64,9 @@ impl MockPaneRepo {
     /// Create a new empty [`MockPaneRepo`].
     #[must_use]
     pub fn new() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -98,7 +102,9 @@ impl MockSessionRepo {
     /// Create a new empty [`MockSessionRepo`].
     #[must_use]
     pub fn new() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -152,7 +158,10 @@ pub fn run_block_repo_conformance(repo: &dyn BlockRepo) {
         finished_at: Some(OffsetDateTime::UNIX_EPOCH),
     };
 
-    assert!(repo.insert_block(&row).is_ok(), "insert_block must return Ok");
+    assert!(
+        repo.insert_block(&row).is_ok(),
+        "insert_block must return Ok"
+    );
 
     let fetched = repo.get_block(block_id);
     assert!(fetched.is_ok(), "get_block must return Ok");
@@ -205,7 +214,10 @@ pub fn run_session_repo_conformance(repo: &dyn SessionRepo) {
         started_at: OffsetDateTime::UNIX_EPOCH,
     };
 
-    assert!(repo.insert_session(&row).is_ok(), "insert_session must return Ok");
+    assert!(
+        repo.insert_session(&row).is_ok(),
+        "insert_session must return Ok"
+    );
 
     let fetched = repo.get_session(session_id);
     assert!(fetched.is_ok(), "get_session must return Ok");

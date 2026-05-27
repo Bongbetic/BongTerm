@@ -1,6 +1,6 @@
 //! `cargo xtask doctor` — environment readiness check.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::process::Command;
 
 pub fn run() -> Result<()> {
@@ -19,7 +19,10 @@ pub fn run() -> Result<()> {
 
     report.print();
     if report.has_failures() {
-        Err(anyhow!("doctor reports {} failure(s)", report.failure_count()))
+        Err(anyhow!(
+            "doctor reports {} failure(s)",
+            report.failure_count()
+        ))
     } else {
         Ok(())
     }
@@ -51,24 +54,32 @@ impl Report {
         for (name, r) in &self.rows {
             match r {
                 Ok(detail) => println!("  ok  {name:30} {detail}"),
-                Err(err)   => println!(" FAIL {name:30} {err}"),
+                Err(err) => println!(" FAIL {name:30} {err}"),
             }
         }
     }
 }
 
 fn check_windows_version() -> Result<String> {
-    let out = Command::new("cmd").args(["/c", "ver"]).output().context("cmd ver")?;
+    let out = Command::new("cmd")
+        .args(["/c", "ver"])
+        .output()
+        .context("cmd ver")?;
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 fn check_rust_toolchain() -> Result<String> {
-    let out = Command::new("rustc").arg("--version").output().context("rustc --version")?;
+    let out = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .context("rustc --version")?;
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 fn check_vs_build_tools() -> Result<String> {
-    Command::new("cl.exe").arg("/?").output()
+    Command::new("cl.exe")
+        .arg("/?")
+        .output()
         .map_err(|_| anyhow!("cl.exe not on PATH; install VS Build Tools 2022"))?;
     Ok("cl.exe present".to_string())
 }
@@ -88,12 +99,14 @@ fn check_msix_tooling() -> Result<String> {
     let makeappx = which("makeappx.exe").ok();
     Ok(match makeappx {
         Some(m) => format!("signtool={signtool}, makeappx={m}"),
-        None    => format!("signtool={signtool}; makeappx missing (install via Win SDK)"),
+        None => format!("signtool={signtool}; makeappx missing (install via Win SDK)"),
     })
 }
 
 fn check_submodule_state() -> Result<String> {
-    let out = Command::new("git").args(["submodule", "status"]).output()
+    let out = Command::new("git")
+        .args(["submodule", "status"])
+        .output()
         .context("git submodule status")?;
     let s = String::from_utf8_lossy(&out.stdout);
     if s.lines().any(|l| l.starts_with('+') || l.starts_with('-')) {
@@ -109,7 +122,11 @@ fn check_code_signing_cert() -> Result<String> {
 
 fn check_defender() -> Result<String> {
     let ps = Command::new("powershell")
-        .args(["-NoProfile", "-Command", "(Get-MpComputerStatus).RealTimeProtectionEnabled"])
+        .args([
+            "-NoProfile",
+            "-Command",
+            "(Get-MpComputerStatus).RealTimeProtectionEnabled",
+        ])
         .output()
         .context("Get-MpComputerStatus")?;
     Ok(String::from_utf8_lossy(&ps.stdout).trim().to_string())
@@ -117,21 +134,35 @@ fn check_defender() -> Result<String> {
 
 fn check_gpu_adapter() -> Result<String> {
     let ps = Command::new("powershell")
-        .args(["-NoProfile", "-Command",
-            "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"])
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
+        ])
         .output()
         .context("Win32_VideoController")?;
-    Ok(String::from_utf8_lossy(&ps.stdout).trim().replace('\n', " | "))
+    Ok(String::from_utf8_lossy(&ps.stdout)
+        .trim()
+        .replace('\n', " | "))
 }
 
 fn check_wsl() -> Result<String> {
-    let out = Command::new("wsl").arg("--status").output().context("wsl --status")?;
+    let out = Command::new("wsl")
+        .arg("--status")
+        .output()
+        .context("wsl --status")?;
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 fn which(exe: &str) -> Result<String> {
-    let out = Command::new("where").arg(exe).output().context("where command")?;
+    let out = Command::new("where")
+        .arg(exe)
+        .output()
+        .context("where command")?;
     let s = String::from_utf8_lossy(&out.stdout);
-    let first = s.lines().next().ok_or_else(|| anyhow!("{exe} not on PATH"))?;
+    let first = s
+        .lines()
+        .next()
+        .ok_or_else(|| anyhow!("{exe} not on PATH"))?;
     Ok(first.trim().to_string())
 }

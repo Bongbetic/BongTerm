@@ -9,7 +9,9 @@
 
 #[cfg(test)]
 mod tests {
-    use bongterm_secrets_api::{ConsumerId, ResolveError, SecretRef, SecretScope, SecretStore, SecretValue};
+    use bongterm_secrets_api::{
+        ConsumerId, ResolveError, SecretRef, SecretScope, SecretStore, SecretValue,
+    };
     use bongterm_security::{
         Decision, EnforcementLevel, MockPolicyEvaluator, PolicyEvaluator, PolicyRequest, RiskClass,
     };

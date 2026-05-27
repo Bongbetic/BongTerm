@@ -15,7 +15,12 @@ pub fn run(backend: &impl RendererBackend) {
         rows: 24,
         cells: vec![0u32; 80 * 24],
     };
-    let dirty = [DirtyRegion { col: 0, row: 0, width: 80, height: 24 }];
+    let dirty = [DirtyRegion {
+        col: 0,
+        row: 0,
+        width: 80,
+        height: 24,
+    }];
 
     assert!(
         backend.render_frame(&snapshot, &dirty).is_ok(),

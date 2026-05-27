@@ -218,11 +218,18 @@ mod tests {
         let mock = MockMcpTransport::new();
         let config = McpServerConfig {
             name: "test-server".to_string(),
-            argv: vec!["npx".to_string(), "-y".to_string(), "@modelcontextprotocol/server-test".to_string()],
+            argv: vec![
+                "npx".to_string(),
+                "-y".to_string(),
+                "@modelcontextprotocol/server-test".to_string(),
+            ],
             env: vec![],
         };
         let err = mock.start(config).unwrap_err();
-        assert!(matches!(err, McpError::ForbiddenArgv(_)), "expected ForbiddenArgv, got {err:?}");
+        assert!(
+            matches!(err, McpError::ForbiddenArgv(_)),
+            "expected ForbiddenArgv, got {err:?}"
+        );
     }
 
     #[test]
@@ -241,7 +248,10 @@ mod tests {
         let mock = MockMcpTransport::new();
         let config = McpServerConfig {
             name: "npx-server".to_string(),
-            argv: vec!["npx".to_string(), "@modelcontextprotocol/server-test".to_string()],
+            argv: vec![
+                "npx".to_string(),
+                "@modelcontextprotocol/server-test".to_string(),
+            ],
             env: vec![],
         };
         assert!(mock.start(config).is_ok());
@@ -250,15 +260,25 @@ mod tests {
     #[test]
     fn list_tools_fails_when_not_started() {
         let mock = MockMcpTransport::new();
-        assert!(matches!(mock.list_tools().unwrap_err(), McpError::NotStarted));
+        assert!(matches!(
+            mock.list_tools().unwrap_err(),
+            McpError::NotStarted
+        ));
     }
 
     #[test]
     fn call_tool_records_count() {
         let mock = MockMcpTransport::new();
-        let config = McpServerConfig { name: "s".to_string(), argv: vec!["node".to_string()], env: vec![] };
+        let config = McpServerConfig {
+            name: "s".to_string(),
+            argv: vec!["node".to_string()],
+            env: vec![],
+        };
         mock.start(config).unwrap();
-        let req = McpToolRequest { tool_name: "t".to_string(), arguments_json: "{}".to_string() };
+        let req = McpToolRequest {
+            tool_name: "t".to_string(),
+            arguments_json: "{}".to_string(),
+        };
         mock.call_tool(req).unwrap();
         assert_eq!(mock.collect_metrics().calls_total, 1);
     }

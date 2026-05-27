@@ -10,8 +10,14 @@ use bongterm_agents::AgentAdapter;
 /// does not satisfy the port contract.
 pub fn run(adapter: &impl AgentAdapter) {
     let result = adapter.discover();
-    assert!(result.found, "discover() must return found == true for a present adapter");
+    assert!(
+        result.found,
+        "discover() must return found == true for a present adapter"
+    );
 
     let caps = adapter.capabilities();
-    assert!(!caps.name.is_empty(), "capabilities().name must be non-empty");
+    assert!(
+        !caps.name.is_empty(),
+        "capabilities().name must be non-empty"
+    );
 }

@@ -27,7 +27,11 @@ pub fn run() -> Result<()> {
         eprintln!(
             "check-licenses: WARNING — {} packages have no license field: {}",
             unknown.len(),
-            unknown.iter().map(|(n, _, _)| n.as_str()).collect::<Vec<_>>().join(", ")
+            unknown
+                .iter()
+                .map(|(n, _, _)| n.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         );
         eprintln!("check-licenses: resolve before release (hard fail removed for Phase 0)");
     }

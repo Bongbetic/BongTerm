@@ -132,6 +132,9 @@ mod tests {
         let s = Settings::default();
         let json = serde_json::to_string(&s).unwrap();
         let s2: Settings = serde_json::from_str(&json).unwrap();
-        assert_eq!(s.keybindings.command_palette, s2.keybindings.command_palette);
+        assert_eq!(
+            s.keybindings.command_palette,
+            s2.keybindings.command_palette
+        );
     }
 }

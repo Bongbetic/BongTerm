@@ -27,7 +27,11 @@ pub fn run() -> Result<()> {
         },
         "components": components,
     });
-    fs::write("sbom.cdx.json", serde_json::to_string_pretty(&sbom)?).context("write sbom.cdx.json")?;
-    println!("sbom: wrote sbom.cdx.json ({} components)", metadata.packages.len());
+    fs::write("sbom.cdx.json", serde_json::to_string_pretty(&sbom)?)
+        .context("write sbom.cdx.json")?;
+    println!(
+        "sbom: wrote sbom.cdx.json ({} components)",
+        metadata.packages.len()
+    );
     Ok(())
 }

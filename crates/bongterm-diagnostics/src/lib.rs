@@ -40,6 +40,10 @@ mod tests {
     #[test]
     fn crash_dir_contains_bongterm() {
         let d = crash_dir();
-        assert!(d.to_string_lossy().to_ascii_lowercase().contains("bongterm"));
+        assert!(
+            d.to_string_lossy()
+                .to_ascii_lowercase()
+                .contains("bongterm")
+        );
     }
 }

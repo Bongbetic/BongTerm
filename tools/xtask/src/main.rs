@@ -58,13 +58,13 @@ fn main() -> Result<()> {
     }
 }
 
-mod doctor;
+mod bench_report;
 mod check_deps;
 mod check_licenses;
-mod upstream_sync;
-mod sbom;
-mod bench_report;
-mod secret_leak_corpus;
-mod prompt_injection_corpus;
 mod cleanup_chunks;
+mod doctor;
 mod package_msix;
+mod prompt_injection_corpus;
+mod sbom;
+mod secret_leak_corpus;
+mod upstream_sync;

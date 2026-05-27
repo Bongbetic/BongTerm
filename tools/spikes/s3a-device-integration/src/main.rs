@@ -10,10 +10,10 @@
 
 #![allow(clippy::pedantic)]
 
+use iced::mouse;
 use iced::widget::shader::{self, Shader};
 use iced::widget::{button, column, text};
 use iced::{Element, Event, Fill, Length, Rectangle, Task};
-use iced::mouse;
 
 // Re-exported by iced_widget::shader; backed by iced_wgpu::primitive.
 use iced::widget::shader::{Pipeline, Primitive};
@@ -205,7 +205,9 @@ impl shader::Program<Message> for TerminalShaderProgram {
         // Hue cycles based on frame counter driven by Tick messages.
         // Program::draw() only constructs the Primitive; no wgpu access here.
         let hue = (self.frame % 360) as f32;
-        TerminalQuad { color: hue_to_rgb(hue) }
+        TerminalQuad {
+            color: hue_to_rgb(hue),
+        }
     }
 }
 
@@ -235,7 +237,10 @@ fn update(state: &mut AppState, msg: Message) -> Task<Message> {
     match msg {
         Message::Ping => {
             state.ping_count += 1;
-            println!("[S3a] ping #{} — Iced event routing works alongside shader widget", state.ping_count);
+            println!(
+                "[S3a] ping #{} — Iced event routing works alongside shader widget",
+                state.ping_count
+            );
         }
         Message::Tick => {
             state.shader.frame = state.shader.frame.wrapping_add(1);
@@ -258,9 +263,7 @@ fn view(state: &AppState) -> Element<'_, Message> {
         .padding(8)
         .align_y(iced::alignment::Vertical::Center);
 
-    column![shader_widget, controls]
-        .spacing(4)
-        .into()
+    column![shader_widget, controls].spacing(4).into()
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -272,8 +275,7 @@ fn main() -> iced::Result {
         "S3a \u{2013} device integration shape".to_owned()
     }
     fn subscription(_state: &AppState) -> iced::Subscription<Message> {
-        iced::time::every(std::time::Duration::from_millis(16))
-            .map(|_| Message::Tick)
+        iced::time::every(std::time::Duration::from_millis(16)).map(|_| Message::Tick)
     }
 
     let result = iced::application(AppState::default, update, view)
@@ -287,13 +289,27 @@ fn main() -> iced::Result {
             println!();
             println!("S3a result: Shader widget approach WORKS");
             println!("  Observations:");
-            println!("  - iced::widget::shader::Program::draw() returns a Primitive; no direct RenderPass access from draw().");
-            println!("  - device + queue accessible in Primitive::prepare() and Pipeline::new() only.");
-            println!("  - wgpu commands (draw calls, texture uploads) issue correctly from Primitive::draw() / render().");
-            println!("  - Primitive::draw() shares Iced's RenderPass (preferred path; bounds + scissor pre-set by Iced).");
-            println!("  - Primitive::render() fallback receives CommandEncoder + full TextureView; clears entire surface.");
-            println!("  - Iced event routing (button Ping) coexists correctly with shader widget redraws.");
-            println!("  - For production: implement draw() returning true with a real wgpu RenderPipeline.");
+            println!(
+                "  - iced::widget::shader::Program::draw() returns a Primitive; no direct RenderPass access from draw()."
+            );
+            println!(
+                "  - device + queue accessible in Primitive::prepare() and Pipeline::new() only."
+            );
+            println!(
+                "  - wgpu commands (draw calls, texture uploads) issue correctly from Primitive::draw() / render()."
+            );
+            println!(
+                "  - Primitive::draw() shares Iced's RenderPass (preferred path; bounds + scissor pre-set by Iced)."
+            );
+            println!(
+                "  - Primitive::render() fallback receives CommandEncoder + full TextureView; clears entire surface."
+            );
+            println!(
+                "  - Iced event routing (button Ping) coexists correctly with shader widget redraws."
+            );
+            println!(
+                "  - For production: implement draw() returning true with a real wgpu RenderPipeline."
+            );
         }
         Err(e) => {
             println!("S3a result: FAILS: {e:?}");

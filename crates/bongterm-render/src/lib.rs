@@ -157,11 +157,7 @@ impl Default for MockRendererBackend {
 }
 
 impl RendererBackend for MockRendererBackend {
-    fn upload_glyphs(
-        &self,
-        _font_key: &FontKey,
-        _glyphs: &[GlyphData],
-    ) -> Result<(), RenderError> {
+    fn upload_glyphs(&self, _font_key: &FontKey, _glyphs: &[GlyphData]) -> Result<(), RenderError> {
         Ok(())
     }
 
@@ -223,8 +219,12 @@ mod tests {
     #[test]
     fn mock_tracks_frame_count() {
         let mock = MockRendererBackend::new();
-        let snapshot =
-            SurfaceSnapshot { id: SnapshotId(1), cols: 80, rows: 24, cells: vec![] };
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(1),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
         mock.render_frame(&snapshot, &[]).unwrap();
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.frames_rendered(), 2);
@@ -233,8 +233,12 @@ mod tests {
     #[test]
     fn mock_metrics_frame_count() {
         let mock = MockRendererBackend::new();
-        let snapshot =
-            SurfaceSnapshot { id: SnapshotId(0), cols: 80, rows: 24, cells: vec![] };
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(0),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.collect_metrics().frames_rendered, 1);
     }
