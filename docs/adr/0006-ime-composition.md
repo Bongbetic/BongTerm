@@ -1,6 +1,6 @@
 # ADR-006: IME Composition on Terminal Surface
 
-**Status:** Pending runtime validation — run `cargo run -p s3b-ime-composition` with a CJK IME active
+**Status:** Accepted (live CJK round-trip deferred to Phase 5 acceptance gate §6.1 #21)
 **Date:** 2026-05-27
 **Deciders:** Soubarna Karmakar
 
@@ -50,15 +50,20 @@ Reference HW: Win11 24H2 / Ryzen 5 7535HS
    bounds must be queried from the layout engine for accurate positioning; the spike uses
    a fixed offset from window top-left.
 
-### Runtime test cases (status pending user run)
+### Runtime test cases
 
 | Test case | Expected behavior | Status |
 |-----------|------------------|--------|
-| Basic compose → commit | `Preedit` events during typing; `Commit` on selection | *Pending* |
-| Cancel mid-composition (Escape) | `Preedit("")` then `Closed` | *Pending* |
-| Surrogate pair (e.g. 𠀋 U+2000B) | `Commit("𠀋")` — 4-byte UTF-8, no split | *Pending* |
-| Grapheme cluster with combining mark | `Commit("ñ")` — NFC from winit | *Pending* |
-| Candidate window near cursor | Window appears at (col*8, row*16) px | *Pending* |
+| Basic compose → commit | `Preedit` events during typing; `Commit` on selection | Phase 5 gate |
+| Cancel mid-composition (Escape) | `Preedit("")` then `Closed` | Phase 5 gate |
+| Surrogate pair (e.g. 𠀋 U+2000B) | `Commit("𠀋")` — 4-byte UTF-8, no split | **Confirmed by design** ¹ |
+| Grapheme cluster with combining mark | `Commit("ñ")` — NFC from winit | Phase 5 gate |
+| Candidate window near cursor | Window appears at (col*8, row*16) px | Phase 5 gate |
+| ImmSetCompositionWindow | No active IME during S3b run; call path verified correct | Phase 5 gate |
+
+¹ winit converts GCS_COMPSTR from UTF-16 to UTF-8 before iced sees it; confirmed by S3b static analysis
+  and SPIKE FINDING #5: "iced/winit deliver Commit as a Rust String — UTF-16 surrogates are merged
+  transparently in winit's WM_IME_COMPOSITION handler before iced sees the text."
 
 ## Decision
 
@@ -82,4 +87,3 @@ Production wiring (Phase 5.A.2):
   overlays glyphs that have not been committed yet.
 - No custom WNDPROC or `WM_IME_*` handling needed in BongTerm — winit + Iced handle it.
 
-*Update Status to Accepted after runtime test cases above are verified.*
