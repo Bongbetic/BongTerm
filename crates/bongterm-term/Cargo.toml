@@ -13,3 +13,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "parser_throughput"
+harness = false
+path = "../../benches/parser_throughput.rs"
