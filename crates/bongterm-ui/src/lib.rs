@@ -8,7 +8,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 use bongterm_settings::{KeybindingSettings, Settings};
-use iced::widget::{column, container, row, stack, text, text_input};
+use iced::widget::{button, column, container, row, stack, text, text_input};
 use iced::{Element, Length, Task, Theme};
 
 pub type ShellResult = iced::Result;
@@ -275,6 +275,82 @@ impl PaletteState {
 }
 
 // ---------------------------------------------------------------------------
+// Onboarding
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnboardingStep {
+    Welcome,
+    Shell,
+    Appearance,
+    ShellIntegration,
+    AgentsDetected,
+    PrivacyAndStorage,
+    ResourceBudgets,
+    Finish,
+}
+
+impl OnboardingStep {
+    fn next(self) -> Self {
+        match self {
+            Self::Welcome => Self::Shell,
+            Self::Shell => Self::Appearance,
+            Self::Appearance => Self::ShellIntegration,
+            Self::ShellIntegration => Self::AgentsDetected,
+            Self::AgentsDetected => Self::PrivacyAndStorage,
+            Self::PrivacyAndStorage => Self::ResourceBudgets,
+            Self::ResourceBudgets => Self::Finish,
+            Self::Finish => Self::Finish,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedShell {
+    pub name: String,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedAgent {
+    pub name: String,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct OnboardingState {
+    pub step: OnboardingStep,
+    pub detected_shells: Vec<DetectedShell>,
+    pub detected_agents: Vec<DetectedAgent>,
+}
+
+impl Default for OnboardingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OnboardingState {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            step: OnboardingStep::Welcome,
+            detected_shells: vec![],
+            detected_agents: vec![],
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.step = self.step.next();
+    }
+
+    #[must_use]
+    pub fn is_finished(&self) -> bool {
+        self.step == OnboardingStep::Finish
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Shell messages
 // ---------------------------------------------------------------------------
 
@@ -287,6 +363,8 @@ pub enum ShellMessage {
     PaletteSelectNext,
     PaletteSelectPrev,
     PaletteExecuteSelected,
+    OnboardingAdvance,
+    OnboardingFinish,
 }
 
 // ---------------------------------------------------------------------------
@@ -304,10 +382,20 @@ pub struct BongTermShell {
     palette_state: PaletteState,
     keymap: KeyboardMap,
     settings: Settings,
+    onboarding_active: bool,
+    onboarding_state: OnboardingState,
 }
 
 impl Default for BongTermShell {
     fn default() -> Self {
+        Self::with_settings(Settings::default())
+    }
+}
+
+impl BongTermShell {
+    #[must_use]
+    pub fn with_settings(settings: Settings) -> Self {
+        let onboarding_active = !settings.onboarding.completed;
         Self {
             workspace_name: "workspace".to_string(),
             focus: ShellFocus::Terminal,
@@ -317,12 +405,27 @@ impl Default for BongTermShell {
             command_palette: CommandPalette::default(),
             palette_state: PaletteState::default(),
             keymap: KeyboardMap,
-            settings: Settings::default(),
+            onboarding_active,
+            onboarding_state: OnboardingState::new(),
+            settings,
         }
     }
-}
 
-impl BongTermShell {
+    #[must_use]
+    pub fn is_onboarding_active(&self) -> bool {
+        self.onboarding_active
+    }
+
+    #[must_use]
+    pub fn onboarding_state(&self) -> &OnboardingState {
+        &self.onboarding_state
+    }
+
+    #[must_use]
+    pub fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
     #[must_use]
     pub fn title(&self) -> String {
         format!("BongTerm - {}", self.workspace_name)
@@ -418,6 +521,13 @@ impl BongTermShell {
                     }
                 }
             }
+            ShellMessage::OnboardingAdvance => {
+                self.onboarding_state.advance();
+            }
+            ShellMessage::OnboardingFinish => {
+                self.settings.onboarding.completed = true;
+                self.onboarding_active = false;
+            }
         }
 
         Task::none()
@@ -456,7 +566,7 @@ impl BongTermShell {
         })
     }
 
-    pub fn view(&self) -> Element<'_, ShellMessage> {
+    fn main_view(&self) -> Element<'_, ShellMessage> {
         let title_bar = text(self.title()).size(16);
         let tab_strip = row![text("[PowerShell - workspace]"), text("[+]")].spacing(8);
         let body = row![
@@ -479,6 +589,15 @@ impl BongTermShell {
             stack![base, self.palette_overlay()].into()
         } else {
             base
+        }
+    }
+
+    pub fn view(&self) -> Element<'_, ShellMessage> {
+        let main = self.main_view();
+        if self.onboarding_active {
+            stack![main, self.onboarding_overlay()].into()
+        } else {
+            main
         }
     }
 
@@ -525,6 +644,116 @@ impl BongTermShell {
                 left: 0.0,
             })
             .into()
+    }
+
+    fn onboarding_overlay(&self) -> Element<'_, ShellMessage> {
+        let step_label = match self.onboarding_state.step {
+            OnboardingStep::Welcome => "Welcome",
+            OnboardingStep::Shell => "Shell",
+            OnboardingStep::Appearance => "Appearance",
+            OnboardingStep::ShellIntegration => "Shell Integration",
+            OnboardingStep::AgentsDetected => "Agents Detected",
+            OnboardingStep::PrivacyAndStorage => "Privacy & Storage",
+            OnboardingStep::ResourceBudgets => "Resource Budgets",
+            OnboardingStep::Finish => "Finish",
+        };
+
+        let is_finish = self.onboarding_state.is_finished();
+        let next_btn = if is_finish {
+            button(text("Get Started")).on_press(ShellMessage::OnboardingFinish)
+        } else {
+            button(text("Next")).on_press(ShellMessage::OnboardingAdvance)
+        };
+
+        let body = self.onboarding_step_body();
+
+        let card = container(
+            column![
+                text(step_label).size(20),
+                body,
+                next_btn,
+            ]
+            .spacing(16),
+        )
+        .width(480)
+        .padding(24)
+        .style(|_theme: &Theme| iced::widget::container::Style {
+            background: Some(iced::Background::Color(iced::Color::from_rgb(0.12, 0.12, 0.15))),
+            border: iced::Border {
+                color: iced::Color::from_rgb(0.35, 0.35, 0.45),
+                width: 1.0,
+                radius: 12.0.into(),
+            },
+            ..Default::default()
+        });
+
+        container(card)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(iced::alignment::Horizontal::Center)
+            .align_y(iced::alignment::Vertical::Center)
+            .into()
+    }
+
+    fn onboarding_step_body(&self) -> Element<'_, ShellMessage> {
+        match self.onboarding_state.step {
+            OnboardingStep::Welcome => {
+                text("BongTerm — run CLI agents in parallel worktrees.").into()
+            }
+            OnboardingStep::Shell => {
+                let shells = &self.onboarding_state.detected_shells;
+                if shells.is_empty() {
+                    text("No shells detected. You can configure shells later in settings.").into()
+                } else {
+                    let items: Vec<Element<'_, ShellMessage>> = shells
+                        .iter()
+                        .map(|s| {
+                            let label = if s.available {
+                                format!("{} (available)", s.name)
+                            } else {
+                                format!("{} (unavailable)", s.name)
+                            };
+                            text(label).into()
+                        })
+                        .collect();
+                    column(items).spacing(4).into()
+                }
+            }
+            OnboardingStep::Appearance => {
+                text("Theme and font settings can be adjusted in settings.json5.").into()
+            }
+            OnboardingStep::ShellIntegration => {
+                text("Shell integration enables command blocks and exit-code tracking.").into()
+            }
+            OnboardingStep::AgentsDetected => {
+                let agents = &self.onboarding_state.detected_agents;
+                if agents.is_empty() {
+                    text("No agents detected. Agents can be configured later.").into()
+                } else {
+                    let items: Vec<Element<'_, ShellMessage>> = agents
+                        .iter()
+                        .map(|a| {
+                            let label = if a.available {
+                                format!("{} (available)", a.name)
+                            } else {
+                                format!("{} (unavailable)", a.name)
+                            };
+                            text(label).into()
+                        })
+                        .collect();
+                    column(items).spacing(4).into()
+                }
+            }
+            OnboardingStep::PrivacyAndStorage => {
+                text("Telemetry is off by default. Local storage only.").into()
+            }
+            OnboardingStep::ResourceBudgets => {
+                text("Default resource budgets apply. Adjust in settings.").into()
+            }
+            OnboardingStep::Finish => {
+                text("Setup complete. Open a shell to get started.").into()
+            }
+        }
     }
 
     #[must_use]
@@ -831,5 +1060,100 @@ mod tests {
         }
         shell.update(ShellMessage::PaletteExecuteSelected);
         assert!(shell.command_palette_open(), "palette must stay open for disabled command");
+    }
+
+    // --- 1.A.4 onboarding tests ---
+
+    #[test]
+    fn onboarding_state_starts_at_welcome_step() {
+        let state = OnboardingState::new();
+        assert_eq!(state.step, OnboardingStep::Welcome);
+        assert!(!state.is_finished());
+    }
+
+    #[test]
+    fn onboarding_advances_through_all_steps_in_order() {
+        let mut state = OnboardingState::new();
+        let expected = [
+            OnboardingStep::Welcome,
+            OnboardingStep::Shell,
+            OnboardingStep::Appearance,
+            OnboardingStep::ShellIntegration,
+            OnboardingStep::AgentsDetected,
+            OnboardingStep::PrivacyAndStorage,
+            OnboardingStep::ResourceBudgets,
+            OnboardingStep::Finish,
+        ];
+        for &step in &expected {
+            assert_eq!(state.step, step);
+            if step != OnboardingStep::Finish {
+                state.advance();
+            }
+        }
+        assert!(state.is_finished());
+    }
+
+    #[test]
+    fn onboarding_completes_without_optional_integrations() {
+        // Acceptance criterion 1: user can finish without optional integrations.
+        let mut state = OnboardingState::new();
+        // Advance through all 7 transitions (Welcome->...->Finish)
+        for _ in 0..7 {
+            state.advance();
+        }
+        assert!(state.is_finished());
+    }
+
+    #[test]
+    fn onboarding_missing_shells_and_agents_advance_without_error() {
+        // Acceptance criterion 2: missing shell or agent → disabled state, not error.
+        // Empty detected lists; advancing through Shell and AgentsDetected must not panic.
+        let mut state = OnboardingState::new();
+        assert!(state.detected_shells.is_empty());
+        assert!(state.detected_agents.is_empty());
+        // Advance through all steps
+        for _ in 0..7 {
+            state.advance();
+        }
+        assert!(state.is_finished());
+    }
+
+    #[test]
+    fn shell_active_when_onboarding_not_completed() {
+        use bongterm_settings::OnboardingSettings;
+        let settings = Settings {
+            onboarding: OnboardingSettings { completed: false, ..OnboardingSettings::default() },
+            ..Settings::default()
+        };
+        let shell = BongTermShell::with_settings(settings);
+        assert!(shell.is_onboarding_active());
+    }
+
+    #[test]
+    fn shell_inactive_when_onboarding_completed() {
+        use bongterm_settings::OnboardingSettings;
+        let settings = Settings {
+            onboarding: OnboardingSettings { completed: true, ..OnboardingSettings::default() },
+            ..Settings::default()
+        };
+        let shell = BongTermShell::with_settings(settings);
+        assert!(!shell.is_onboarding_active());
+    }
+
+    #[test]
+    fn shell_onboarding_advance_moves_to_next_step() {
+        let mut shell = BongTermShell::default();
+        assert_eq!(shell.onboarding_state().step, OnboardingStep::Welcome);
+        shell.update(ShellMessage::OnboardingAdvance);
+        assert_eq!(shell.onboarding_state().step, OnboardingStep::Shell);
+    }
+
+    #[test]
+    fn shell_onboarding_finish_deactivates_and_marks_completed() {
+        let mut shell = BongTermShell::default();
+        assert!(shell.is_onboarding_active());
+        shell.update(ShellMessage::OnboardingFinish);
+        assert!(!shell.is_onboarding_active());
+        assert!(shell.settings().onboarding.completed);
     }
 }

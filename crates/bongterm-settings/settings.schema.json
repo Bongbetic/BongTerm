@@ -8,6 +8,9 @@
     },
     "theme": {
       "$ref": "#/definitions/ThemeSettings"
+    },
+    "onboarding": {
+      "$ref": "#/definitions/OnboardingSettings"
     }
   },
   "definitions": {
@@ -52,6 +55,9 @@
     "ThemeSettings": {
       "type": "object",
       "properties": {
+        "contrast": {
+          "type": "string"
+        },
         "font_family": {
           "type": "string"
         },
@@ -61,6 +67,23 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "OnboardingSettings": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        },
+        "default_shell": {
+          "type": "string"
+        },
+        "shell_integration_enabled": {
+          "type": "boolean"
+        },
+        "telemetry_enabled": {
+          "type": "boolean"
         }
       }
     }

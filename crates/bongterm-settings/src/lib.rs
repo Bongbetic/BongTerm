@@ -55,6 +55,7 @@ pub struct ThemeSettings {
     pub name: String,
     pub font_family: String,
     pub font_size: f32,
+    pub contrast: String,
 }
 
 impl Default for ThemeSettings {
@@ -63,6 +64,27 @@ impl Default for ThemeSettings {
             name: "dark".to_string(),
             font_family: "Cascadia Code".to_string(),
             font_size: 13.0,
+            contrast: "normal".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct OnboardingSettings {
+    pub completed: bool,
+    pub default_shell: String,
+    pub shell_integration_enabled: bool,
+    pub telemetry_enabled: bool,
+}
+
+impl Default for OnboardingSettings {
+    fn default() -> Self {
+        Self {
+            completed: false,
+            default_shell: "powershell".to_string(),
+            shell_integration_enabled: true,
+            telemetry_enabled: false,
         }
     }
 }
@@ -72,6 +94,7 @@ impl Default for ThemeSettings {
 pub struct Settings {
     pub keybindings: KeybindingSettings,
     pub theme: ThemeSettings,
+    pub onboarding: OnboardingSettings,
 }
 
 impl Settings {
@@ -340,5 +363,50 @@ mod tests {
         assert!(text.contains("explain_last_failed"), "schema missing explain_last_failed");
         assert!(text.contains("attach_context"), "schema missing attach_context");
         assert!(text.contains("toggle_background_jobs"), "schema missing toggle_background_jobs");
+    }
+
+    #[test]
+    fn onboarding_settings_not_completed_by_default() {
+        let s = Settings::default();
+        assert!(!s.onboarding.completed);
+    }
+
+    #[test]
+    fn onboarding_settings_telemetry_off_by_default() {
+        let s = Settings::default();
+        assert!(!s.onboarding.telemetry_enabled);
+    }
+
+    #[test]
+    fn onboarding_settings_default_shell_is_powershell() {
+        let s = Settings::default();
+        assert_eq!(s.onboarding.default_shell, "powershell");
+    }
+
+    #[test]
+    fn onboarding_settings_shell_integration_on_by_default() {
+        let s = Settings::default();
+        assert!(s.onboarding.shell_integration_enabled);
+    }
+
+    #[test]
+    fn onboarding_settings_survive_serde_roundtrip() {
+        let s = Settings::default();
+        let json = serde_json::to_string(&s).unwrap();
+        let s2: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(s.onboarding.completed, s2.onboarding.completed);
+        assert_eq!(s.onboarding.telemetry_enabled, s2.onboarding.telemetry_enabled);
+        assert_eq!(s.onboarding.default_shell, s2.onboarding.default_shell);
+        assert_eq!(s.onboarding.shell_integration_enabled, s2.onboarding.shell_integration_enabled);
+    }
+
+    #[test]
+    fn generated_schema_contains_onboarding_section() {
+        let schema = settings_schema_json();
+        let text = serde_json::to_string(&schema).unwrap();
+        assert!(text.contains("onboarding"));
+        assert!(text.contains("telemetry_enabled"));
+        assert!(text.contains("default_shell"));
+        assert!(text.contains("shell_integration_enabled"));
     }
 }
