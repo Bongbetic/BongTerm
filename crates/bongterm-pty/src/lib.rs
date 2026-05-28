@@ -10,3 +10,6 @@ pub use ring::{Slab, SlabPool};
 
 pub mod host;
 pub use host::{ChildSpec, PtyChild, PtyHost, PortablePtyHost, ScaffoldPtyHost};
+
+pub mod reader;
+pub use reader::PtyReaderTask;

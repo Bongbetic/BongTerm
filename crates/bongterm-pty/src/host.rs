@@ -33,8 +33,8 @@ pub trait PtyHost: Send + Sync {
 pub struct PtyChild {
     /// OS process identifier.
     pub pid: u32,
-    /// Read half of the PTY master (child stdout/stderr).
-    pub reader: Box<dyn std::io::Read + Send>,
+    /// Read half of the PTY master. `take_reader()` hands it to `PtyReaderTask`.
+    reader: Option<Box<dyn std::io::Read + Send>>,
     /// Write half of the PTY master (child stdin).
     pub writer: Box<dyn std::io::Write + Send>,
     // Keep master alive: ConPTY `Arc<Mutex<Inner>>` holds the HPCON; dropping
@@ -42,6 +42,13 @@ pub struct PtyChild {
     _master: Box<dyn portable_pty::MasterPty + Send>,
     // Keep child handle alive for future wait()/kill() calls.
     _child: Box<dyn portable_pty::Child + Send + Sync>,
+}
+
+impl PtyChild {
+    /// Take the read half of the PTY master. Returns `None` if already taken.
+    pub fn take_reader(&mut self) -> Option<Box<dyn std::io::Read + Send>> {
+        self.reader.take()
+    }
 }
 
 /// Phase 0 scaffold: always returns an error.
@@ -93,7 +100,7 @@ impl PtyHost for PortablePtyHost {
 
         Ok(PtyChild {
             pid,
-            reader,
+            reader: Some(reader),
             writer,
             _master: master,
             _child: child,
