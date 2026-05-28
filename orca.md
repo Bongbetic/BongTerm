@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | ⏳ Re-plan required before start | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.C.1-5 + 1.D.1 done; `[next]` = 1.D.2 | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 📋 Outline only | — | §6.1 #15,#24 green |
 | **Phase 3** Developer UX | 📋 Outline only | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Outline only | — | §6.1 #16,#19,#23,#31 green + threat-model review |
@@ -120,8 +120,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 - [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
-- [next] 1.D.2 Split h/v, resize, focus cycle
-- 1.D.3 Layout save/restore (workspace only, no detach daemon)
+- [next] 1.D.3 Layout save/restore (workspace only, no detach daemon)
 - 1.E.1 Shell-integration OSC consumer in `bongterm-blocks`
 - 1.E.2 Confidence model: High / Medium / Low / Unsupported per shell
 - 1.E.3 Block boundary detection + tests against `tests/fixtures/osc/`
