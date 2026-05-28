@@ -13,3 +13,6 @@ pub use host::{ChildSpec, PtyChild, PtyHost, PortablePtyHost, ScaffoldPtyHost};
 
 pub mod reader;
 pub use reader::PtyReaderTask;
+
+pub mod dispatcher;
+pub use dispatcher::PtyDispatcher;
