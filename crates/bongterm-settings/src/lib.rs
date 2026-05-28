@@ -187,6 +187,98 @@ impl SettingsProvider for FileSettingsProvider {
     }
 }
 
+// ─── SettingsWriter port ─────────────────────────────────────────────────────
+
+/// Port interface for persisting application settings to a backing store.
+///
+/// Real implementation: [`FileSettingsProvider`].
+/// Test double: [`MockSettingsWriter`].
+pub trait SettingsWriter: Send + Sync {
+    /// Serialize `settings` and write atomically to the backing store.
+    ///
+    /// On success the on-disk representation reflects the new value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SettingsError::Io`] if the write or rename fails.
+    fn write(&self, settings: &Settings) -> Result<(), SettingsError>;
+}
+
+impl SettingsWriter for FileSettingsProvider {
+    fn write(&self, settings: &Settings) -> Result<(), SettingsError> {
+        let json =
+            serde_json::to_string_pretty(settings).expect("Settings must serialize to JSON");
+        // Atomic: write to tmp then rename so readers never see a partial file.
+        let tmp = self.path.with_extension("tmp");
+        std::fs::write(&tmp, json.as_bytes()).map_err(|source| SettingsError::Io {
+            path: tmp.clone(),
+            source,
+        })?;
+        std::fs::rename(&tmp, &self.path).map_err(|source| SettingsError::Io {
+            path: self.path.clone(),
+            source,
+        })?;
+        Ok(())
+    }
+}
+
+/// Test double for [`SettingsWriter`]. Records every call for assertion in tests.
+pub struct MockSettingsWriter {
+    write_calls: Arc<std::sync::Mutex<Vec<Settings>>>,
+    fail: Arc<std::sync::Mutex<bool>>,
+}
+
+impl MockSettingsWriter {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            write_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+            fail: Arc::new(std::sync::Mutex::new(false)),
+        }
+    }
+
+    /// Configure the mock to return an error on every subsequent `write` call.
+    pub fn set_fail(&self, should_fail: bool) {
+        *self.fail.lock().expect("lock not poisoned") = should_fail;
+    }
+
+    /// All [`Settings`] values passed to [`SettingsWriter::write`] in call order.
+    #[must_use]
+    pub fn write_calls(&self) -> Vec<Settings> {
+        self.write_calls
+            .lock()
+            .expect("lock not poisoned")
+            .clone()
+    }
+}
+
+impl Default for MockSettingsWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SettingsWriter for MockSettingsWriter {
+    fn write(&self, settings: &Settings) -> Result<(), SettingsError> {
+        if *self.fail.lock().expect("lock not poisoned") {
+            return Err(SettingsError::Io {
+                path: PathBuf::from("<mock>"),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "mock write failure",
+                ),
+            });
+        }
+        self.write_calls
+            .lock()
+            .expect("lock not poisoned")
+            .push(settings.clone());
+        Ok(())
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 pub struct MockSettingsProvider {
     settings: ArcSwap<Settings>,
     tx: tokio::sync::watch::Sender<Arc<Settings>>,
@@ -387,6 +479,77 @@ mod tests {
     fn onboarding_settings_shell_integration_on_by_default() {
         let s = Settings::default();
         assert!(s.onboarding.shell_integration_enabled);
+    }
+
+    // --- SettingsWriter ---
+
+    #[test]
+    fn file_provider_write_persists_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json5");
+        let provider = FileSettingsProvider::load_or_default(path.clone()).unwrap();
+
+        let mut new_settings = Settings::default();
+        new_settings.keybindings.command_palette = "Ctrl+Alt+P".to_string();
+
+        provider.write(&new_settings).unwrap();
+
+        let raw = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            raw.contains("Ctrl+Alt+P"),
+            "written file must contain new keybinding"
+        );
+    }
+
+    #[test]
+    fn file_provider_write_then_reload_roundtrips_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json5");
+        let provider = FileSettingsProvider::load_or_default(path.clone()).unwrap();
+
+        let mut new_settings = Settings::default();
+        new_settings.theme.name = "high-contrast".to_string();
+
+        provider.write(&new_settings).unwrap();
+        provider.reload_from_disk().unwrap();
+
+        assert_eq!(provider.current().theme.name, "high-contrast");
+    }
+
+    #[test]
+    fn mock_writer_records_write_calls() {
+        let mock = MockSettingsWriter::new();
+        let s1 = Settings::default();
+        let mut s2 = Settings::default();
+        s2.theme.name = "light".to_string();
+
+        mock.write(&s1).unwrap();
+        mock.write(&s2).unwrap();
+
+        let calls = mock.write_calls();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[1].theme.name, "light");
+    }
+
+    #[test]
+    fn mock_writer_returns_error_when_set_to_fail() {
+        let mock = MockSettingsWriter::new();
+        mock.set_fail(true);
+
+        let err = mock.write(&Settings::default()).unwrap_err();
+        assert!(
+            err.to_string().contains("I/O"),
+            "error message must describe I/O failure, got: {err}"
+        );
+        // no calls recorded on failure
+        assert!(mock.write_calls().is_empty());
+    }
+
+    #[test]
+    fn mock_writer_default_succeeds() {
+        let mock = MockSettingsWriter::default();
+        mock.write(&Settings::default()).unwrap();
+        assert_eq!(mock.write_calls().len(), 1);
     }
 
     #[test]
