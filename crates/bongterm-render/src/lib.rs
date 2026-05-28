@@ -116,6 +116,66 @@ pub fn atlas_vram_exceeded(current_bytes: u64) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Frame pacing (ADR-005 backpressure contract)
+// ---------------------------------------------------------------------------
+
+struct PendingFrame {
+    snapshot_id: SnapshotId,
+    regions: Vec<DirtyRegion>,
+}
+
+/// Single-slot backpressure buffer for dirty regions.
+///
+/// Parser submits dirty regions; render side takes them once per frame.
+/// N submits between takes coalesce into one slot — no unbounded queue.
+/// Caller is responsible for external synchronization across threads.
+pub struct FramePacer {
+    pending: Option<PendingFrame>,
+}
+
+impl FramePacer {
+    /// Creates a new idle [`FramePacer`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self { pending: None }
+    }
+
+    /// Submits dirty regions for a snapshot.
+    /// If a frame is already pending, regions are merged and snapshot_id advances.
+    pub fn submit(&mut self, snapshot_id: SnapshotId, regions: &[DirtyRegion]) {
+        match &mut self.pending {
+            None => {
+                self.pending = Some(PendingFrame {
+                    snapshot_id,
+                    regions: regions.to_vec(), // Phase 1.C.X: pool this allocation
+                });
+            }
+            Some(pending) => {
+                pending.snapshot_id = snapshot_id;
+                pending.regions.extend_from_slice(regions);
+            }
+        }
+    }
+
+    /// Takes the pending frame for rendering. Returns `None` if idle.
+    pub fn take(&mut self) -> Option<(SnapshotId, Vec<DirtyRegion>)> {
+        self.pending.take().map(|f| (f.snapshot_id, f.regions))
+    }
+
+    /// Returns `true` if no frame is pending (render side is caught up).
+    #[must_use]
+    pub fn is_idle(&self) -> bool {
+        self.pending.is_none()
+    }
+}
+
+impl Default for FramePacer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Cell NDC helpers
 // ---------------------------------------------------------------------------
 
@@ -415,6 +475,72 @@ mod tests {
         ];
         let total: u32 = regions.iter().map(dirty_region_quad_count).sum();
         assert_eq!(total, 16);
+    }
+
+    // --- 1.C.3: frame pacing ---
+
+    #[test]
+    fn new_pacer_is_idle() {
+        let pacer = FramePacer::new();
+        assert!(pacer.is_idle());
+    }
+
+    #[test]
+    fn submit_marks_pacer_pending() {
+        let mut pacer = FramePacer::new();
+        pacer.submit(SnapshotId(1), &[DirtyRegion { col: 0, row: 0, width: 10, height: 5 }]);
+        assert!(!pacer.is_idle());
+    }
+
+    #[test]
+    fn take_returns_submitted_regions_and_clears_pending() {
+        let mut pacer = FramePacer::new();
+        let region = DirtyRegion { col: 0, row: 0, width: 10, height: 5 };
+        pacer.submit(SnapshotId(3), &[region]);
+        let (id, regions) = pacer.take().unwrap();
+        assert_eq!(id, SnapshotId(3));
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0], region);
+        assert!(pacer.is_idle());
+    }
+
+    #[test]
+    fn take_from_idle_returns_none() {
+        let mut pacer = FramePacer::new();
+        assert!(pacer.take().is_none());
+    }
+
+    #[test]
+    fn coalesce_preserves_all_regions_from_missed_frames() {
+        let mut pacer = FramePacer::new();
+        let r1 = DirtyRegion { col: 0, row: 0, width: 10, height: 1 };
+        let r2 = DirtyRegion { col: 0, row: 5, width: 10, height: 2 };
+        pacer.submit(SnapshotId(1), &[r1]);
+        pacer.submit(SnapshotId(2), &[r2]);
+        let (_, regions) = pacer.take().unwrap();
+        assert_eq!(regions.len(), 2);
+        assert!(regions.contains(&r1));
+        assert!(regions.contains(&r2));
+    }
+
+    #[test]
+    fn latest_snapshot_id_wins_after_coalescing() {
+        let mut pacer = FramePacer::new();
+        pacer.submit(SnapshotId(1), &[DirtyRegion { col: 0, row: 0, width: 1, height: 1 }]);
+        pacer.submit(SnapshotId(99), &[DirtyRegion { col: 1, row: 0, width: 1, height: 1 }]);
+        let (id, _) = pacer.take().unwrap();
+        assert_eq!(id, SnapshotId(99));
+    }
+
+    #[test]
+    fn n_submits_produce_single_pending_slot() {
+        let mut pacer = FramePacer::new();
+        for i in 0..5 {
+            pacer.submit(SnapshotId(i), &[DirtyRegion { col: 0, row: 0, width: 1, height: 1 }]);
+        }
+        assert!(pacer.take().is_some());
+        assert!(pacer.is_idle());
+        assert!(pacer.take().is_none());
     }
 
     #[test]
