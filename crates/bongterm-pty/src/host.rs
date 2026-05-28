@@ -64,7 +64,7 @@ impl PtyHost for ScaffoldPtyHost {
     }
 }
 
-/// Phase 1 real implementation backed by `portable-pty` / Windows ConPTY.
+/// Phase 1 real implementation backed by `portable-pty` / Windows `ConPTY`.
 pub struct PortablePtyHost;
 
 impl PtyHost for PortablePtyHost {

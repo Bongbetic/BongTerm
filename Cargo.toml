@@ -22,12 +22,6 @@ members = [
     "crates/bongterm-diagnostics",
     "crates/bongterm-test-kit",
     "tools/xtask",
-    # Wave 0 spike harnesses — deleted after their ADR is accepted.
-    "tools/spikes/s1-renderer-latency",
-    "tools/spikes/s2-vram-eviction",
-    "tools/spikes/s3a-device-integration",
-    "tools/spikes/s3b-ime-composition",
-    "tools/spikes/s4-wezterm-api-stability",
 ]
 
 [workspace.package]
@@ -75,8 +69,8 @@ proptest = "1"
 arbitrary = { version = "1", features = ["derive"] }
 insta = { version = "1", features = ["yaml", "redactions"] }
 # Renderer + UI (Phase 0 scaffold pulls these in for compilation; product use begins after ADR-002+):
-wgpu = "0.20"
-glyphon = "0.6"
+wgpu = "27"
+cryoglyph = "0.1"
 iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio", "advanced"] }
 # Diagnostics:
 minidump-writer = "0.10"

@@ -27,6 +27,7 @@ impl PtyReaderTask {
     /// - `reader`: read half from [`PtyChild::take_reader()`].
     /// - `pool`: slab pool; one slab per read, returned to pool on drop.
     /// - `capacity`: bound on the outbound channel.
+    #[must_use]
     pub fn spawn(mut reader: Box<dyn Read + Send>, pool: SlabPool, capacity: usize) -> Self {
         let (tx, rx) = mpsc::sync_channel(capacity);
         let handle = thread::spawn(move || loop {
