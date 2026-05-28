@@ -29,7 +29,7 @@ pub struct TabId(u64);
 // ─── DTOs ───────────────────────────────────────────────────────────────────
 
 /// Position and size of a pane within the terminal window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Rect {
     /// Row offset from the top of the window.
     pub top: u16,
@@ -70,6 +70,186 @@ pub struct TabInfo {
 #[derive(Debug)]
 pub struct ClosedTab {
     pub pane_ids: Vec<PaneId>,
+}
+
+// ─── Layout snapshots ────────────────────────────────────────────────────────
+
+/// Serializable snapshot of a single pane's geometry.
+///
+/// PTY session, working directory, and shell command are NOT included —
+/// those cross module boundaries and are composed by `bongterm-app` in a
+/// higher-level `WorkspaceSnapshot`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PaneSnapshot {
+    pub rect: Rect,
+}
+
+/// Serializable snapshot of a single tab's pane structure and focus state.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TabSnapshot {
+    /// Pane geometries in creation order.
+    pub panes: Vec<PaneSnapshot>,
+    /// Index into `panes` for the active pane.
+    /// Clamped to `panes.len() - 1` on restore; defaults to 0.
+    #[serde(default)]
+    pub active_pane_index: usize,
+}
+
+/// Portable snapshot of the full tab/pane topology.
+///
+/// `PaneId` and `TabId` values are ephemeral and are **not** preserved —
+/// new IDs are minted on restore. Use [`RestoreResult`] to reconnect sessions.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LayoutSnapshot {
+    /// Tabs in insertion order.
+    pub tabs: Vec<TabSnapshot>,
+    /// Index into `tabs` for the active tab. `None` if `tabs` is empty.
+    #[serde(default)]
+    pub active_tab_index: Option<usize>,
+}
+
+/// Returned by [`MuxRouter::restore`] with the freshly-minted IDs.
+///
+/// Indices mirror the snapshot:
+/// - `tab_ids[i]` ↔ `snapshot.tabs[i]`
+/// - `pane_ids[i][j]` ↔ `snapshot.tabs[i].panes[j]`
+#[derive(Debug, Clone)]
+pub struct RestoreResult {
+    /// New `TabId`s in order matching the snapshot's `tabs`.
+    pub tab_ids: Vec<TabId>,
+    /// New `PaneId`s per tab, in order matching each tab's `panes`.
+    pub pane_ids: Vec<Vec<PaneId>>,
+    /// Active tab after restore (`None` if the snapshot was empty).
+    pub active_tab_id: Option<TabId>,
+}
+
+// ─── LayoutRepo port ─────────────────────────────────────────────────────────
+
+/// Port for persisting a [`LayoutSnapshot`] to a backing store.
+///
+/// Real implementation: [`FileLayoutRepo`].
+/// Test double: [`MockLayoutRepo`].
+pub trait LayoutRepo: Send + Sync {
+    /// Serialize and persist `snapshot`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LayoutRepoError`] on I/O or serialization failure.
+    fn save(&self, snapshot: &LayoutSnapshot) -> Result<(), LayoutRepoError>;
+
+    /// Load the most recently saved snapshot, or `None` if none exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LayoutRepoError`] on I/O or deserialization failure.
+    fn load(&self) -> Result<Option<LayoutSnapshot>, LayoutRepoError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LayoutRepoError {
+    #[error("layout I/O failed for {path}: {source}")]
+    Io {
+        path: std::path::PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("layout JSON parse failed: {source}")]
+    Parse {
+        #[source]
+        source: serde_json::Error,
+    },
+}
+
+/// File-backed [`LayoutRepo`] implementation.
+///
+/// Saves as pretty-printed JSON using an atomic write (tmp→rename).
+pub struct FileLayoutRepo {
+    path: std::path::PathBuf,
+}
+
+impl FileLayoutRepo {
+    #[must_use]
+    pub fn new(path: impl Into<std::path::PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+}
+
+impl LayoutRepo for FileLayoutRepo {
+    fn save(&self, snapshot: &LayoutSnapshot) -> Result<(), LayoutRepoError> {
+        let json =
+            serde_json::to_string_pretty(snapshot).expect("LayoutSnapshot must serialize");
+        let tmp = self.path.with_extension("tmp");
+        std::fs::write(&tmp, json.as_bytes()).map_err(|source| LayoutRepoError::Io {
+            path: tmp.clone(),
+            source,
+        })?;
+        std::fs::rename(&tmp, &self.path).map_err(|source| LayoutRepoError::Io {
+            path: self.path.clone(),
+            source,
+        })?;
+        Ok(())
+    }
+
+    fn load(&self) -> Result<Option<LayoutSnapshot>, LayoutRepoError> {
+        if !self.path.exists() {
+            return Ok(None);
+        }
+        let json =
+            std::fs::read_to_string(&self.path).map_err(|source| LayoutRepoError::Io {
+                path: self.path.clone(),
+                source,
+            })?;
+        let snapshot = serde_json::from_str(&json).map_err(|source| LayoutRepoError::Parse {
+            source,
+        })?;
+        Ok(Some(snapshot))
+    }
+}
+
+/// Call-recording test double for [`LayoutRepo`].
+pub struct MockLayoutRepo {
+    save_calls: Arc<parking_lot::Mutex<Vec<LayoutSnapshot>>>,
+    stored: Arc<parking_lot::Mutex<Option<LayoutSnapshot>>>,
+}
+
+impl MockLayoutRepo {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            save_calls: Arc::new(parking_lot::Mutex::new(Vec::new())),
+            stored: Arc::new(parking_lot::Mutex::new(None)),
+        }
+    }
+
+    /// All snapshots passed to [`LayoutRepo::save`] in call order.
+    #[must_use]
+    pub fn save_calls(&self) -> Vec<LayoutSnapshot> {
+        self.save_calls.lock().clone()
+    }
+
+    /// Pre-load a snapshot that [`LayoutRepo::load`] will return.
+    pub fn set_stored(&self, snapshot: LayoutSnapshot) {
+        *self.stored.lock() = Some(snapshot);
+    }
+}
+
+impl Default for MockLayoutRepo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LayoutRepo for MockLayoutRepo {
+    fn save(&self, snapshot: &LayoutSnapshot) -> Result<(), LayoutRepoError> {
+        let mut calls = self.save_calls.lock();
+        calls.push(snapshot.clone());
+        *self.stored.lock() = Some(snapshot.clone());
+        Ok(())
+    }
+
+    fn load(&self) -> Result<Option<LayoutSnapshot>, LayoutRepoError> {
+        Ok(self.stored.lock().clone())
+    }
 }
 
 // ─── Error ──────────────────────────────────────────────────────────────────
@@ -165,6 +345,19 @@ pub trait MuxRouter: Send + Sync {
     ///
     /// Returns [`MuxError::TabNotFound`] if `tab_id` is not open.
     fn focus_next_pane(&self, tab_id: TabId) -> Result<PaneId, MuxError>;
+
+    /// Capture the current tab/pane topology as a portable snapshot.
+    ///
+    /// Ephemeral IDs (`TabId`, `PaneId`) are **not** included. Use
+    /// [`MuxRouter::restore`] to recreate the topology and obtain fresh IDs.
+    fn snapshot(&self) -> LayoutSnapshot;
+
+    /// Replace the current topology with `snapshot`.
+    ///
+    /// All existing tabs and panes are cleared; new IDs are minted.
+    /// Returns [`RestoreResult`] with the new IDs so the caller can
+    /// reconnect PTY sessions.
+    fn restore(&self, snapshot: &LayoutSnapshot) -> RestoreResult;
 }
 
 // ─── InMemoryMux ────────────────────────────────────────────────────────────
@@ -413,6 +606,103 @@ impl MuxRouter for InMemoryMux {
         tab.active_pane_id = next;
         Ok(next)
     }
+
+    fn snapshot(&self) -> LayoutSnapshot {
+        let s = self.state.read();
+        let active_tab_index = s
+            .active_tab
+            .and_then(|active| s.tab_order.iter().position(|&t| t == active));
+        let tabs = s
+            .tab_order
+            .iter()
+            .map(|&tab_id| {
+                let entry = &s.tabs[&tab_id];
+                let panes = entry
+                    .pane_ids
+                    .iter()
+                    .map(|&pane_id| PaneSnapshot {
+                        rect: s.panes[&pane_id].rect,
+                    })
+                    .collect();
+                let active_pane_index = entry
+                    .pane_ids
+                    .iter()
+                    .position(|&p| p == entry.active_pane_id)
+                    .unwrap_or(0);
+                TabSnapshot {
+                    panes,
+                    active_pane_index,
+                }
+            })
+            .collect();
+        LayoutSnapshot {
+            tabs,
+            active_tab_index,
+        }
+    }
+
+    fn restore(&self, snapshot: &LayoutSnapshot) -> RestoreResult {
+        let mut s = self.state.write();
+
+        // Clear existing topology.
+        s.tabs.clear();
+        s.panes.clear();
+        s.tab_order.clear();
+        s.active_tab = None;
+
+        let mut tab_ids: Vec<TabId> = Vec::with_capacity(snapshot.tabs.len());
+        let mut pane_ids: Vec<Vec<PaneId>> = Vec::with_capacity(snapshot.tabs.len());
+
+        for tab_snap in &snapshot.tabs {
+            let tab_id = s.alloc_tab_id();
+            let mut pane_ids_for_tab: Vec<PaneId> =
+                Vec::with_capacity(tab_snap.panes.len());
+
+            for pane_snap in &tab_snap.panes {
+                let pane_id = s.alloc_pane_id();
+                s.panes.insert(
+                    pane_id,
+                    PaneEntry {
+                        tab_id,
+                        rect: pane_snap.rect,
+                    },
+                );
+                pane_ids_for_tab.push(pane_id);
+            }
+
+            // Clamp active_pane_index to valid range; default to first pane if empty.
+            let active_pane_id = if pane_ids_for_tab.is_empty() {
+                // Empty tab: no valid pane. Use id 0 as sentinel (never allocated).
+                PaneId(0)
+            } else {
+                let idx =
+                    tab_snap.active_pane_index.min(pane_ids_for_tab.len() - 1);
+                pane_ids_for_tab[idx]
+            };
+
+            s.tabs.insert(
+                tab_id,
+                TabEntry {
+                    pane_ids: pane_ids_for_tab.clone(),
+                    active_pane_id,
+                },
+            );
+            s.tab_order.push(tab_id);
+            tab_ids.push(tab_id);
+            pane_ids.push(pane_ids_for_tab);
+        }
+
+        let active_tab_id = snapshot
+            .active_tab_index
+            .and_then(|i| tab_ids.get(i).copied());
+        s.active_tab = active_tab_id;
+
+        RestoreResult {
+            tab_ids,
+            pane_ids,
+            active_tab_id,
+        }
+    }
 }
 
 // ─── MockMuxRouter ──────────────────────────────────────────────────────────
@@ -432,6 +722,7 @@ struct MockCalls {
     resize_pane: Vec<(PaneId, Rect)>,
     split_pane: Vec<(PaneId, SplitDirection)>,
     focus_next_pane: Vec<TabId>,
+    restore: Vec<LayoutSnapshot>,
 }
 
 impl MockMuxRouter {
@@ -477,6 +768,12 @@ impl MockMuxRouter {
     #[must_use]
     pub fn focus_next_pane_calls(&self) -> Vec<TabId> {
         self.calls.lock().focus_next_pane.clone()
+    }
+
+    /// All [`LayoutSnapshot`]s passed to [`MuxRouter::restore`] in call order.
+    #[must_use]
+    pub fn restore_calls(&self) -> Vec<LayoutSnapshot> {
+        self.calls.lock().restore.clone()
     }
 }
 
@@ -531,6 +828,15 @@ impl MuxRouter for MockMuxRouter {
     fn focus_next_pane(&self, tab_id: TabId) -> Result<PaneId, MuxError> {
         self.calls.lock().focus_next_pane.push(tab_id);
         self.delegate.focus_next_pane(tab_id)
+    }
+
+    fn snapshot(&self) -> LayoutSnapshot {
+        self.delegate.snapshot()
+    }
+
+    fn restore(&self, snapshot: &LayoutSnapshot) -> RestoreResult {
+        self.calls.lock().restore.push(snapshot.clone());
+        self.delegate.restore(snapshot)
     }
 }
 
@@ -1078,5 +1384,375 @@ mod tests {
         assert_eq!(mock.active_tab_id(), Some(tab_id));
         mock.close_tab(tab_id).unwrap();
         assert_eq!(mock.active_tab_id(), None);
+    }
+
+    // --- snapshot ---
+
+    #[test]
+    fn snapshot_empty_mux_yields_empty_layout() {
+        let mux = InMemoryMux::new();
+        let snap = mux.snapshot();
+        assert!(snap.tabs.is_empty());
+        assert_eq!(snap.active_tab_index, None);
+    }
+
+    #[test]
+    fn snapshot_single_tab_one_pane() {
+        let mux = InMemoryMux::new();
+        mux.create_tab(80, 24);
+        let snap = mux.snapshot();
+        assert_eq!(snap.tabs.len(), 1);
+        assert_eq!(snap.tabs[0].panes.len(), 1);
+        assert_eq!(
+            snap.tabs[0].panes[0].rect,
+            Rect {
+                top: 0,
+                left: 0,
+                cols: 80,
+                rows: 24
+            }
+        );
+        assert_eq!(snap.tabs[0].active_pane_index, 0);
+        assert_eq!(snap.active_tab_index, Some(0));
+    }
+
+    #[test]
+    fn snapshot_active_tab_index_matches_current_active() {
+        let mux = InMemoryMux::new();
+        mux.create_tab(80, 24);
+        let _b = mux.create_tab(80, 24);
+        let c = mux.create_tab(80, 24);
+        mux.set_active_tab(c).unwrap();
+        // c is at index 2
+        assert_eq!(mux.snapshot().active_tab_index, Some(2));
+    }
+
+    #[test]
+    fn snapshot_active_pane_index_matches_focused_pane() {
+        let mux = InMemoryMux::new();
+        let tab_id = mux.create_tab(80, 24);
+        let orig = mux.tab_info(tab_id).unwrap().pane_ids[0];
+        mux.split_pane(orig, SplitDirection::Horizontal).unwrap();
+        mux.focus_next_pane(tab_id).unwrap(); // focus moves to sibling (index 1)
+
+        let snap = mux.snapshot();
+        assert_eq!(snap.tabs[0].active_pane_index, 1);
+    }
+
+    #[test]
+    fn snapshot_multiple_tabs_captures_all() {
+        let mux = InMemoryMux::new();
+        mux.create_tab(80, 24);
+        mux.create_tab(132, 50);
+        let snap = mux.snapshot();
+        assert_eq!(snap.tabs.len(), 2);
+        assert_eq!(snap.tabs[0].panes[0].rect.cols, 80);
+        assert_eq!(snap.tabs[1].panes[0].rect.cols, 132);
+    }
+
+    // --- restore ---
+
+    #[test]
+    fn restore_empty_snapshot_clears_existing_state() {
+        let mux = InMemoryMux::new();
+        mux.create_tab(80, 24);
+        let empty = LayoutSnapshot {
+            tabs: vec![],
+            active_tab_index: None,
+        };
+        let result = mux.restore(&empty);
+        assert!(result.tab_ids.is_empty());
+        assert_eq!(mux.active_tab_id(), None);
+        assert!(mux.tab_ids().is_empty());
+    }
+
+    #[test]
+    fn restore_recreates_single_tab_one_pane() {
+        let mux = InMemoryMux::new();
+        let snap = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![PaneSnapshot {
+                    rect: Rect {
+                        top: 0,
+                        left: 0,
+                        cols: 80,
+                        rows: 24,
+                    },
+                }],
+                active_pane_index: 0,
+            }],
+            active_tab_index: Some(0),
+        };
+        let result = mux.restore(&snap);
+        assert_eq!(result.tab_ids.len(), 1);
+        assert_eq!(result.pane_ids[0].len(), 1);
+        assert_eq!(result.active_tab_id, Some(result.tab_ids[0]));
+
+        let pane_id = result.pane_ids[0][0];
+        assert_eq!(
+            mux.pane_info(pane_id).unwrap().rect,
+            Rect {
+                top: 0,
+                left: 0,
+                cols: 80,
+                rows: 24
+            }
+        );
+    }
+
+    #[test]
+    fn restore_sets_active_tab() {
+        let mux = InMemoryMux::new();
+        let snap = LayoutSnapshot {
+            tabs: vec![
+                TabSnapshot {
+                    panes: vec![PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 0,
+                            cols: 80,
+                            rows: 24,
+                        },
+                    }],
+                    active_pane_index: 0,
+                },
+                TabSnapshot {
+                    panes: vec![PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 0,
+                            cols: 132,
+                            rows: 50,
+                        },
+                    }],
+                    active_pane_index: 0,
+                },
+            ],
+            active_tab_index: Some(1),
+        };
+        let result = mux.restore(&snap);
+        assert_eq!(mux.active_tab_id(), Some(result.tab_ids[1]));
+    }
+
+    #[test]
+    fn restore_sets_active_pane_within_tab() {
+        let mux = InMemoryMux::new();
+        let snap = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![
+                    PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 0,
+                            cols: 40,
+                            rows: 24,
+                        },
+                    },
+                    PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 40,
+                            cols: 40,
+                            rows: 24,
+                        },
+                    },
+                ],
+                active_pane_index: 1,
+            }],
+            active_tab_index: Some(0),
+        };
+        let result = mux.restore(&snap);
+        let tab_info = mux.tab_info(result.tab_ids[0]).unwrap();
+        assert_eq!(tab_info.active_pane_id, result.pane_ids[0][1]);
+    }
+
+    #[test]
+    fn restore_replaces_existing_state() {
+        let mux = InMemoryMux::new();
+        mux.create_tab(80, 24);
+        mux.create_tab(80, 24);
+        // Restore to single tab
+        let snap = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![PaneSnapshot {
+                    rect: Rect {
+                        top: 0,
+                        left: 0,
+                        cols: 100,
+                        rows: 30,
+                    },
+                }],
+                active_pane_index: 0,
+            }],
+            active_tab_index: Some(0),
+        };
+        mux.restore(&snap);
+        assert_eq!(mux.tab_ids().len(), 1);
+    }
+
+    #[test]
+    fn restore_mints_fresh_ids() {
+        let mux = InMemoryMux::new();
+        let original_tab = mux.create_tab(80, 24);
+
+        let snap = mux.snapshot();
+        let result = mux.restore(&snap);
+
+        // New IDs must differ from the original ones
+        assert_ne!(result.tab_ids[0], original_tab);
+    }
+
+    #[test]
+    fn snapshot_restore_roundtrip() {
+        let mux = InMemoryMux::new();
+        let tab1 = mux.create_tab(80, 24);
+        let pane1 = mux.tab_info(tab1).unwrap().pane_ids[0];
+        mux.split_pane(pane1, SplitDirection::Horizontal).unwrap();
+        mux.create_tab(132, 50);
+
+        let snap1 = mux.snapshot();
+        mux.restore(&snap1);
+        let snap2 = mux.snapshot();
+
+        assert_eq!(snap1, snap2);
+    }
+
+    #[test]
+    fn layout_snapshot_json_roundtrip() {
+        let snap = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![
+                    PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 0,
+                            cols: 40,
+                            rows: 24,
+                        },
+                    },
+                    PaneSnapshot {
+                        rect: Rect {
+                            top: 0,
+                            left: 40,
+                            cols: 40,
+                            rows: 24,
+                        },
+                    },
+                ],
+                active_pane_index: 1,
+            }],
+            active_tab_index: Some(0),
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        let restored: LayoutSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(snap, restored);
+    }
+
+    // --- FileLayoutRepo ---
+
+    #[test]
+    fn file_layout_repo_save_and_load_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("layout.json");
+        let repo = FileLayoutRepo::new(&path);
+
+        let snap = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![PaneSnapshot {
+                    rect: Rect {
+                        top: 0,
+                        left: 0,
+                        cols: 80,
+                        rows: 24,
+                    },
+                }],
+                active_pane_index: 0,
+            }],
+            active_tab_index: Some(0),
+        };
+
+        repo.save(&snap).unwrap();
+        let loaded = repo.load().unwrap().expect("should load saved snapshot");
+        assert_eq!(snap, loaded);
+    }
+
+    #[test]
+    fn file_layout_repo_load_absent_returns_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nonexistent.json");
+        let repo = FileLayoutRepo::new(&path);
+        assert!(repo.load().unwrap().is_none());
+    }
+
+    #[test]
+    fn file_layout_repo_save_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("layout.json");
+        let repo = FileLayoutRepo::new(&path);
+        let snap = LayoutSnapshot {
+            tabs: vec![],
+            active_tab_index: None,
+        };
+        repo.save(&snap).unwrap();
+        assert!(path.exists());
+    }
+
+    // --- MockLayoutRepo ---
+
+    #[test]
+    fn mock_layout_repo_records_save_calls() {
+        let mock = MockLayoutRepo::new();
+        let snap1 = LayoutSnapshot {
+            tabs: vec![],
+            active_tab_index: None,
+        };
+        let snap2 = LayoutSnapshot {
+            tabs: vec![TabSnapshot {
+                panes: vec![PaneSnapshot {
+                    rect: Rect {
+                        top: 0,
+                        left: 0,
+                        cols: 80,
+                        rows: 24,
+                    },
+                }],
+                active_pane_index: 0,
+            }],
+            active_tab_index: Some(0),
+        };
+        mock.save(&snap1).unwrap();
+        mock.save(&snap2).unwrap();
+        assert_eq!(mock.save_calls().len(), 2);
+    }
+
+    #[test]
+    fn mock_layout_repo_load_returns_none_initially() {
+        let mock = MockLayoutRepo::new();
+        assert!(mock.load().unwrap().is_none());
+    }
+
+    #[test]
+    fn mock_layout_repo_set_stored_controls_load() {
+        let mock = MockLayoutRepo::new();
+        let snap = LayoutSnapshot {
+            tabs: vec![],
+            active_tab_index: None,
+        };
+        mock.set_stored(snap.clone());
+        assert_eq!(mock.load().unwrap(), Some(snap));
+    }
+
+    // --- MockMuxRouter restore recording ---
+
+    #[test]
+    fn mock_mux_records_restore_calls() {
+        let mock = MockMuxRouter::new();
+        let snap = LayoutSnapshot {
+            tabs: vec![],
+            active_tab_index: None,
+        };
+        mock.restore(&snap);
+        mock.restore(&snap);
+        assert_eq!(mock.restore_calls().len(), 2);
     }
 }
