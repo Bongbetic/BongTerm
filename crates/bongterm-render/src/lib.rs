@@ -244,6 +244,8 @@ impl TerminalPrimitive {
 /// GPU-side state: shared cryoglyph atlas + renderer (ADR-004 + ADR-005).
 ///
 /// Created once by Iced on first [`TerminalPrimitive`] encounter (ADR-005 §1).
+/// On DXGI DEVICE_REMOVED, Iced calls [`Storage::clear`] and invokes `new` again
+/// with a fresh device — this IS the device-loss recovery path (1.C.4).
 /// Phase 1.C.3 will wire `prepare`/`draw` to actually render glyphs.
 pub struct TerminalPipeline {
     atlas: cryoglyph::TextAtlas,
@@ -308,6 +310,7 @@ struct MockState {
     last_snapshot_id: Option<SnapshotId>,
     frames_rendered: u64,
     vram_budget: u64,
+    device_lost: bool,
 }
 
 /// In-memory mock renderer for tests; records calls without touching GPU.
@@ -343,6 +346,15 @@ impl MockRendererBackend {
     pub fn frames_rendered(&self) -> u64 {
         self.state.lock().unwrap().frames_rendered
     }
+
+    /// Simulates a DXGI DEVICE_REMOVED event for testing device-loss recovery.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    pub fn force_device_loss(&self) {
+        self.state.lock().unwrap().device_lost = true;
+    }
 }
 
 impl Default for MockRendererBackend {
@@ -352,7 +364,13 @@ impl Default for MockRendererBackend {
 }
 
 impl RendererBackend for MockRendererBackend {
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     fn upload_glyphs(&self, _font_key: &FontKey, _glyphs: &[GlyphData]) -> Result<(), RenderError> {
+        if self.state.lock().unwrap().device_lost {
+            return Err(RenderError::DeviceLost);
+        }
         Ok(())
     }
 
@@ -365,6 +383,9 @@ impl RendererBackend for MockRendererBackend {
         _dirty_regions: &[DirtyRegion],
     ) -> Result<(), RenderError> {
         let mut s = self.state.lock().unwrap();
+        if s.device_lost {
+            return Err(RenderError::DeviceLost);
+        }
         s.last_snapshot_id = Some(snapshot.id);
         s.frames_rendered += 1;
         Ok(())
@@ -475,6 +496,53 @@ mod tests {
         ];
         let total: u32 = regions.iter().map(dirty_region_quad_count).sum();
         assert_eq!(total, 16);
+    }
+
+    // --- 1.C.4: device-loss recovery ---
+
+    #[test]
+    fn mock_returns_device_lost_after_forced_loss() {
+        let mock = MockRendererBackend::new();
+        mock.force_device_loss();
+        let snapshot = SurfaceSnapshot { id: SnapshotId(1), cols: 80, rows: 24, cells: vec![] };
+        let err = mock.render_frame(&snapshot, &[]).unwrap_err();
+        assert!(matches!(err, RenderError::DeviceLost));
+    }
+
+    #[test]
+    fn device_lost_does_not_increment_frame_count() {
+        let mock = MockRendererBackend::new();
+        let snapshot = SurfaceSnapshot { id: SnapshotId(1), cols: 80, rows: 24, cells: vec![] };
+        mock.render_frame(&snapshot, &[]).unwrap();
+        mock.force_device_loss();
+        let _ = mock.render_frame(&snapshot, &[]);
+        assert_eq!(mock.frames_rendered(), 1);
+    }
+
+    #[test]
+    fn upload_glyphs_fails_after_device_loss() {
+        let mock = MockRendererBackend::new();
+        mock.force_device_loss();
+        let font = FontKey { family: "Mono".into(), weight: 400, italic: false };
+        let err = mock.upload_glyphs(&font, &[]).unwrap_err();
+        assert!(matches!(err, RenderError::DeviceLost));
+    }
+
+    #[test]
+    fn frame_pacer_state_survives_device_loss() {
+        let mut pacer = FramePacer::new();
+        let region = DirtyRegion { col: 0, row: 0, width: 80, height: 24 };
+        pacer.submit(SnapshotId(5), &[region]);
+
+        let mock = MockRendererBackend::new();
+        mock.force_device_loss();
+
+        // recovery: new backend instance
+        let fresh = MockRendererBackend::new();
+        let snapshot = SurfaceSnapshot { id: SnapshotId(5), cols: 80, rows: 24, cells: vec![] };
+        let (_, regions) = pacer.take().unwrap();
+        fresh.render_frame(&snapshot, &regions).unwrap();
+        assert_eq!(fresh.frames_rendered(), 1);
     }
 
     // --- 1.C.3: frame pacing ---
