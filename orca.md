@@ -45,7 +45,7 @@
 ### Key known issues / deferred items
 
 - **wezterm submodule gitlink** not created — `vendor/wezterm/.gitkeep` removed; fix cmd in `docs/adr/0007-wezterm-submodule.md` § "Fix required before Phase 1.B.3"
-- **wgpu workspace pin** must bump from `"0.20"` → `"22"` before Phase 1.C.1 (glyphon 0.6 requires wgpu ≥22; tracked in ADR-003 + ADR-005 Consequences)
+- **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
 - **CJK IME round-trip** — harness written (`cargo run -p s3b-ime-composition`); live test deferred to Phase 5 gate §6.1 #21
 
@@ -120,8 +120,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
 - [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
-- [next] 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005 *(bump wgpu workspace pin to "22" first)*
-- 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005 *(bump wgpu workspace pin to "22" first)*
+- [next] 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005
 - 1.C.2 Shared glyph atlas with LRU eviction per ADR-004
 - 1.C.3 Frame pacing controller respecting backpressure
 - 1.C.4 Renderer device-loss recovery (DXGI device-removed)
