@@ -120,8 +120,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
 - [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
-- [next] 1.B.4 Backpressure tests (slow renderer + slow transcript)
-- 1.B.5 Per-pane Surface + dirty-region emission
+- [next] 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005 *(bump wgpu workspace pin to "22" first)*
 - 1.C.1 `bongterm-render` real wgpu device + swap chain per ADR-005 *(bump wgpu workspace pin to "22" first)*
 - 1.C.2 Shared glyph atlas with LRU eviction per ADR-004
 - 1.C.3 Frame pacing controller respecting backpressure
