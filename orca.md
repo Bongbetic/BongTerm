@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.C.1-5 + 1.D.1 done; `[next]` = 1.D.2 | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.C.1-5 + 1.D.1-2 done; `[next]` = 1.D.3 | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 📋 Outline only | — | §6.1 #15,#24 green |
 | **Phase 3** Developer UX | 📋 Outline only | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Outline only | — | §6.1 #16,#19,#23,#31 green + threat-model review |
