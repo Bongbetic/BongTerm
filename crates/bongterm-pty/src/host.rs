@@ -1,4 +1,4 @@
-//! `ConPTY` host trait + Phase 0 placeholder implementation.
+//! `ConPTY` host trait + Phase 0 placeholder + Phase 1 real implementation.
 //!
 //! Real `ConPTY` wiring lands in Phase 1 task 1.B.*; this scaffold proves the
 //! surface compiles and locks the trait shape for downstream crates.
@@ -33,7 +33,15 @@ pub trait PtyHost: Send + Sync {
 pub struct PtyChild {
     /// OS process identifier.
     pub pid: u32,
-    // Real impl holds master read/write halves + child process handle.
+    /// Read half of the PTY master (child stdout/stderr).
+    pub reader: Box<dyn std::io::Read + Send>,
+    /// Write half of the PTY master (child stdin).
+    pub writer: Box<dyn std::io::Write + Send>,
+    // Keep master alive: ConPTY `Arc<Mutex<Inner>>` holds the HPCON; dropping
+    // master closes it and breaks the reader/writer pipes.
+    _master: Box<dyn portable_pty::MasterPty + Send>,
+    // Keep child handle alive for future wait()/kill() calls.
+    _child: Box<dyn portable_pty::Child + Send + Sync>,
 }
 
 /// Phase 0 scaffold: always returns an error.
@@ -49,9 +57,64 @@ impl PtyHost for ScaffoldPtyHost {
     }
 }
 
+/// Phase 1 real implementation backed by `portable-pty` / Windows ConPTY.
+pub struct PortablePtyHost;
+
+impl PtyHost for PortablePtyHost {
+    fn spawn(&self, spec: ChildSpec) -> Result<PtyChild> {
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+
+        let pty_system = native_pty_system();
+        let pair = pty_system.openpty(PtySize {
+            rows: spec.rows,
+            cols: spec.cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+
+        let mut cmd = CommandBuilder::new(&spec.command);
+        for arg in &spec.args {
+            cmd.arg(arg);
+        }
+        if let Some(ref cwd) = spec.cwd {
+            cmd.cwd(cwd);
+        }
+        for (key, val) in &spec.env {
+            cmd.env(key, val);
+        }
+
+        let child = pair.slave.spawn_command(cmd)?;
+        let pid = child
+            .process_id()
+            .ok_or_else(|| anyhow::anyhow!("child has no pid"))?;
+        let reader = pair.master.try_clone_reader()?;
+        let writer = pair.master.take_writer()?;
+        let master = pair.master;
+
+        Ok(PtyChild {
+            pid,
+            reader,
+            writer,
+            _master: master,
+            _child: child,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cmd_spec(args: Vec<&str>) -> ChildSpec {
+        ChildSpec {
+            command: PathBuf::from("cmd.exe"),
+            args: args.into_iter().map(str::to_string).collect(),
+            cwd: None,
+            env: vec![],
+            cols: 80,
+            rows: 24,
+        }
+    }
 
     #[test]
     fn scaffold_host_returns_error() {
@@ -65,5 +128,31 @@ mod tests {
             rows: 24,
         });
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn portable_pty_host_spawn_returns_ok() {
+        let h = PortablePtyHost;
+        let r = h.spawn(cmd_spec(vec!["/C", "exit", "0"]));
+        assert!(r.is_ok(), "spawn failed: {:?}", r.err());
+    }
+
+    #[test]
+    fn portable_pty_host_child_pid_is_nonzero() {
+        let h = PortablePtyHost;
+        let child = h
+            .spawn(cmd_spec(vec!["/C", "exit", "0"]))
+            .expect("spawn should succeed");
+        assert!(child.pid > 0);
+    }
+
+    #[test]
+    fn portable_pty_host_writer_accepts_input() {
+        use std::io::Write;
+        let h = PortablePtyHost;
+        let mut child = h
+            .spawn(cmd_spec(vec!["/K"]))
+            .expect("spawn should succeed");
+        assert!(child.writer.write_all(b"exit\r\n").is_ok());
     }
 }

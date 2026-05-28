@@ -9,4 +9,4 @@ pub mod ring;
 pub use ring::{Slab, SlabPool};
 
 pub mod host;
-pub use host::{ChildSpec, PtyChild, PtyHost, ScaffoldPtyHost};
+pub use host::{ChildSpec, PtyChild, PtyHost, PortablePtyHost, ScaffoldPtyHost};

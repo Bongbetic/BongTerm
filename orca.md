@@ -119,8 +119,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 **Implementation outline:**
 
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
-- [next] 1.B.1 ConPTY child spawn (real `portable-pty` impl)
-- 1.B.2 PTY reader task + ring buffer hookup with backpressure
+- [next] 1.B.2 PTY reader task + ring buffer hookup with backpressure
 - 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
 - 1.B.4 Backpressure tests (slow renderer + slow transcript)
 - 1.B.5 Per-pane Surface + dirty-region emission
