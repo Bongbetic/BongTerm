@@ -22,4 +22,4 @@ Low fidelity (ASCII sketches, bullet lists) is acceptable. The goal is a shared 
 
 ## Status
 
-All 10 are placeholders — to be authored before Phase 1 begins.
+All 10 UX contract artifacts exist. Treat them as low-fidelity contracts; update them before changing Phase 1 UI behavior.

@@ -31,3 +31,9 @@ dist/
 *.msix
 *.cer
 *.appx
+
+# Generated knowledge-graph output
+graphify-out/
+
+# Vendor placeholder (wezterm submodule not yet wired; ADR-007)
+vendor/wezterm/

@@ -8,3 +8,4 @@ publish = false
 
 [dependencies]
 bongterm-diagnostics = { path = "../bongterm-diagnostics" }
+bongterm-ui = { path = "../bongterm-ui" }

@@ -1,6 +1,6 @@
 //! `BongTerm` application binary entrypoint.
 
-fn main() {
+fn main() -> bongterm_ui::ShellResult {
     bongterm_diagnostics::install_panic_hook();
-    println!("BongTerm 0.0.0-dev — scaffold; nothing useful yet.");
+    bongterm_ui::run_shell()
 }
