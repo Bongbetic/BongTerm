@@ -19,7 +19,7 @@
 
 | Question | Where to look |
 |----------|--------------|
-| What is BongTerm? | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` (canonical) or `docs/PRD/bongterm_prd_v5.md` (authoritative 3071-line PRD) |
+| What is BongTerm? | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` (canonical, drives §6.1 gate numbering) or `docs/PRD/bongterm_prd_v7.md` (authoritative 1063-line PRD, §0–§23) |
 | What was decided architecturally? | `docs/adr/` — 7 ADRs, all Accepted |
 | What was built in Phase 0? | `git log --oneline v0.0.1-scaffold..v0.0.4-phase0-exit` |
 | What is the Phase 0 TDD plan (full detail)? | `docs/superpowers/plans/2026-05-27-bongt-mvp0.md` |
@@ -36,11 +36,11 @@
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
 | **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.C.1-5 + 1.D.1-2 done; `[next]` = 1.D.3 | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
-| **Phase 2** Agent Observability | 📋 Outline only | — | §6.1 #15,#24 green |
-| **Phase 3** Developer UX | 📋 Outline only | — | §6.1 #9-14 green |
-| **Phase 4** MCP + Secrets + Security | 📋 Outline only | — | §6.1 #16,#19,#23,#31 green + threat-model review |
-| **Phase 5** Hardening + Release Prep | 📋 Outline only | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
-| **Phase 6** Dogfood → Public | 📋 Outline only | — | `v0.1.0-mvp0` shipped |
+| **Phase 2** Agent Observability | 📋 Planned (17 tasks) | — | §6.1 #15,#24 green |
+| **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
+| **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
+| **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
+| **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
 ### Key known issues / deferred items
 
@@ -138,7 +138,9 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 ---
 
-## PHASE 2 — Agent Observability *(outline; re-plan before execution)*
+## PHASE 2 — Agent Observability
+
+> Phase 2 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase2.md` (17 tasks). AnythingLLM `engineer` workspace consulted.
 
 Gates: spec §6.1 #15, #24.
 
@@ -159,7 +161,9 @@ Gates: spec §6.1 #15, #24.
 
 ---
 
-## PHASE 3 — Developer UX *(outline; re-plan before execution)*
+## PHASE 3 — Developer UX
+
+> Phase 3 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase3.md` (21 tasks). AnythingLLM `engineer` workspace consulted.
 
 Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
@@ -184,7 +188,9 @@ Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
 ---
 
-## PHASE 4 — MCP, Secrets, Security *(outline; re-plan before execution)*
+## PHASE 4 — MCP, Secrets, Security
+
+> Phase 4 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase4.md` (23 tasks). AnythingLLM `engineer` workspace consulted.
 
 Gates: spec §6.1 #16, #19, #23, #31.
 
@@ -212,7 +218,9 @@ Gates: spec §6.1 #16, #19, #23, #31.
 
 ---
 
-## PHASE 5 — Hardening + Release Preparation *(outline; re-plan before execution)*
+## PHASE 5 — Hardening + Release Preparation
+
+> Phase 5 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase5.md` (41 tasks). AnythingLLM `engineer` workspace consulted.
 
 Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 
@@ -245,7 +253,9 @@ Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 
 ---
 
-## PHASE 6 — Dogfood + Public Release *(outline; re-plan before execution)*
+## PHASE 6 — Dogfood + Public Release
+
+> Phase 6 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase6.md` (24 tasks). AnythingLLM `engineer` workspace consulted.
 
 Gates: spec §6.1 #22 + §6.6 ship-when checklist.
 
