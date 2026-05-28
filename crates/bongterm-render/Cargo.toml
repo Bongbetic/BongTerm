@@ -8,5 +8,6 @@ publish = false
 
 [dependencies]
 thiserror = { workspace = true }
+iced = { workspace = true }
 
 [dev-dependencies]

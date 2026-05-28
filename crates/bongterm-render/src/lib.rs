@@ -103,6 +103,119 @@ pub trait RendererBackend: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
+// Cell NDC helpers
+// ---------------------------------------------------------------------------
+
+/// NDC quad bounds for a single terminal cell.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CellNdc {
+    pub top_left: [f32; 2],
+    pub bottom_right: [f32; 2],
+}
+
+/// Returns the NDC quad for cell `(col, row)` in a `cols × rows` grid.
+///
+/// Evaluates as `n * 2 / cols` (left-to-right) so the last cell's edge
+/// lands on exactly ±1.0 without floating-point drift.
+#[must_use]
+pub fn cell_quad_ndc(col: u16, row: u16, cols: u16, rows: u16) -> CellNdc {
+    CellNdc {
+        top_left: [
+            -1.0_f32 + f32::from(col) * 2.0_f32 / f32::from(cols),
+            1.0_f32 - f32::from(row) * 2.0_f32 / f32::from(rows),
+        ],
+        bottom_right: [
+            -1.0_f32 + (f32::from(col) + 1.0_f32) * 2.0_f32 / f32::from(cols),
+            1.0_f32 - (f32::from(row) + 1.0_f32) * 2.0_f32 / f32::from(rows),
+        ],
+    }
+}
+
+/// Number of quads a dirty region produces (one per cell).
+#[must_use]
+pub fn dirty_region_quad_count(region: &DirtyRegion) -> u32 {
+    u32::from(region.width) * u32::from(region.height)
+}
+
+// ---------------------------------------------------------------------------
+// Iced Shader widget integration (ADR-005 Shape (a))
+// ---------------------------------------------------------------------------
+
+/// Per-frame data handed to the GPU pipeline.
+#[derive(Debug, Clone)]
+pub struct TerminalPrimitive {
+    snapshot: SurfaceSnapshot,
+    dirty: Vec<DirtyRegion>,
+}
+
+impl TerminalPrimitive {
+    /// Creates a new [`TerminalPrimitive`].
+    #[must_use]
+    pub fn new(snapshot: SurfaceSnapshot, dirty: Vec<DirtyRegion>) -> Self {
+        Self { snapshot, dirty }
+    }
+
+    /// The surface snapshot to render.
+    #[must_use]
+    pub fn snapshot(&self) -> &SurfaceSnapshot {
+        &self.snapshot
+    }
+
+    /// Dirty regions that need repainting.
+    #[must_use]
+    pub fn dirty(&self) -> &[DirtyRegion] {
+        &self.dirty
+    }
+}
+
+/// GPU-side state: wgpu pipeline, vertex buffers, glyph atlas.
+///
+/// Created once by Iced on first [`TerminalPrimitive`] encounter (ADR-005 §1).
+/// Phase 1.C.2 adds `wgpu::RenderPipeline`, buffers, and cryoglyph `TextAtlas`.
+#[derive(Debug)]
+pub struct TerminalPipeline {
+    // Phase 1.C.2: wgpu::RenderPipeline, vertex/index buffers, TextAtlas
+}
+
+impl iced::widget::shader::Pipeline for TerminalPipeline {
+    fn new(
+        _device: &iced::wgpu::Device,
+        _queue: &iced::wgpu::Queue,
+        _format: iced::wgpu::TextureFormat,
+    ) -> Self {
+        Self {}
+    }
+
+    fn trim(&mut self) {
+        // Phase 1.C.2: trim glyph atlas LRU entries per ADR-004
+    }
+}
+
+impl iced::widget::shader::Primitive for TerminalPrimitive {
+    type Pipeline = TerminalPipeline;
+
+    fn prepare(
+        &self,
+        _pipeline: &mut Self::Pipeline,
+        _device: &iced::wgpu::Device,
+        _queue: &iced::wgpu::Queue,
+        _bounds: &iced::Rectangle,
+        _viewport: &iced::widget::shader::Viewport,
+    ) {
+        // Phase 1.C.2: upload dirty cells via queue.write_buffer
+    }
+
+    fn draw(
+        &self,
+        _pipeline: &Self::Pipeline,
+        _render_pass: &mut iced::wgpu::RenderPass<'_>,
+    ) -> bool {
+        // Phase 1.C.2: wgpu draw calls in Iced's RenderPass (ADR-005)
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Mock
 // ---------------------------------------------------------------------------
 
@@ -241,5 +354,45 @@ mod tests {
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.collect_metrics().frames_rendered, 1);
+    }
+
+    // --- 1.C.1: cell NDC + TerminalPrimitive ---
+
+    #[test]
+    fn last_cell_in_grid_reaches_ndc_corner() {
+        let cell = cell_quad_ndc(79, 23, 80, 24);
+        assert_eq!(cell.bottom_right, [1.0_f32, -1.0_f32]);
+    }
+
+    #[test]
+    fn adjacent_cells_share_exact_horizontal_edge() {
+        let left = cell_quad_ndc(0, 0, 80, 24);
+        let right = cell_quad_ndc(1, 0, 80, 24);
+        assert_eq!(left.bottom_right[0], right.top_left[0]);
+    }
+
+    #[test]
+    fn quad_count_matches_sum_of_dirty_regions() {
+        let regions = [
+            DirtyRegion { col: 0, row: 0, width: 3, height: 4 },
+            DirtyRegion { col: 10, row: 5, width: 2, height: 2 },
+        ];
+        let total: u32 = regions.iter().map(dirty_region_quad_count).sum();
+        assert_eq!(total, 16);
+    }
+
+    #[test]
+    fn terminal_primitive_stores_snapshot_and_dirty_regions() {
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(7),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
+        let dirty = vec![DirtyRegion { col: 0, row: 0, width: 80, height: 24 }];
+        let prim = TerminalPrimitive::new(snapshot, dirty);
+        assert_eq!(prim.snapshot().id, SnapshotId(7));
+        assert_eq!(prim.dirty().len(), 1);
+        assert_eq!(prim.dirty()[0].width, 80);
     }
 }
