@@ -7,5 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+bongterm-settings = { path = "../bongterm-settings" }
+iced = { workspace = true }
 
 [dev-dependencies]

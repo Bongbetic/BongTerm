@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Settings",
+  "type": "object",
+  "properties": {
+    "keybindings": {
+      "$ref": "#/definitions/KeybindingSettings"
+    },
+    "theme": {
+      "$ref": "#/definitions/ThemeSettings"
+    }
+  },
+  "definitions": {
+    "KeybindingSettings": {
+      "type": "object",
+      "properties": {
+        "attach_context": {
+          "type": "string"
+        },
+        "close_pane": {
+          "type": "string"
+        },
+        "cmd_k": {
+          "type": "string"
+        },
+        "command_palette": {
+          "type": "string"
+        },
+        "explain_last_failed": {
+          "type": "string"
+        },
+        "find_in_pane": {
+          "type": "string"
+        },
+        "new_tab": {
+          "type": "string"
+        },
+        "open_resource_dashboard": {
+          "type": "string"
+        },
+        "smart_history": {
+          "type": "string"
+        },
+        "split_pane": {
+          "type": "string"
+        },
+        "toggle_background_jobs": {
+          "type": "string"
+        }
+      }
+    },
+    "ThemeSettings": {
+      "type": "object",
+      "properties": {
+        "font_family": {
+          "type": "string"
+        },
+        "font_size": {
+          "format": "float",
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

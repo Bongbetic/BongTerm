@@ -2,7 +2,7 @@
 
 > **Single source of truth for what to do next.** Each completed task is **struck from this list in place** — when a task is done, edit this file and remove it. Do not mark with checkbox-done and leave; do not append history. This file shrinks over time.
 >
-> **Re-plan rule.** Before starting Phase N+1, invoke `superpowers:writing-plans` against the spec section that governs that phase. Phases 1-6 are outlines only — they gain TDD-level detail at their re-plan boundary. **Never implement a phase from outline-level tasks alone.**
+> **Re-plan rule.** Before starting Phase N+1, invoke `superpowers:writing-plans` against the spec section that governs that phase. Also query the AnythingLLM `engineer` workspace for phase-specific engineering insights, risks, ordering changes, and acceptance criteria; fold useful results into the new phase plan. Phases 1-6 are outlines only — they gain TDD-level detail at their re-plan boundary. **Never implement a phase from outline-level tasks alone.**
 >
 > **Status legend:**
 > - `[next]` = next actionable task
@@ -108,7 +108,7 @@ Phase 6 (Dogfood → Public)
 
 ## PHASE 1 — Usable Terminal *(outline; re-plan before execution)*
 
-> **[next] Re-plan step:** Invoke `superpowers:writing-plans` against spec §6.1 #1, #4–#8, #17, #28, #29 to produce TDD-level tasks for this phase. Do not start implementation tasks until that plan exists.
+> Phase 1 re-plan completed: `docs/superpowers/plans/2026-05-28-bongt-phase1.md`.
 >
 > Context for the re-plan: ADR-005 (Iced Shader widget), ADR-003 (wgpu latency confirmed), ADR-004 (atlas eviction), ADR-007 (wezterm-term API surface at `crates/bongterm-term/src/adapter.rs`).
 
@@ -116,23 +116,9 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 **Prerequisite — UX Contract artifacts under `docs/ux/`** (spec §9):
 
-- 1.UX.1 Main window layout sketch
-- 1.UX.2 Command palette behavior
-- 1.UX.3 Pane / tab model sketch
-- 1.UX.4 Agent sidebar sketch
-- 1.UX.5 Resource dashboard sketch
-- 1.UX.6 Error / recovery screen sketch
-- 1.UX.7 First-launch onboarding flow
-- 1.UX.8 Keyboard shortcut table
-- 1.UX.9 Notification taxonomy
-- 1.UX.10 Design tokens (typography, spacing, radius, motion, color, semantic status, danger, focus, high-contrast, reduced-motion)
-
 **Implementation outline:**
 
-- 1.A.1 Settings + JSON5 schema + `schemars`-generated `settings.schema.json` + last-known-good fallback
-- 1.A.2 Iced shell main window using ADR-005 integration shape
-- 1.A.3 Command palette + keyboard map
-- 1.A.4 Onboarding flow
+- [next] 1.A.4 Onboarding flow
 - 1.B.1 ConPTY child spawn (real `portable-pty` impl)
 - 1.B.2 PTY reader task + ring buffer hookup with backpressure
 - 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
