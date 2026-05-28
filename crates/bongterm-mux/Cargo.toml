@@ -7,5 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]

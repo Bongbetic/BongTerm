@@ -241,6 +241,10 @@ dependencies = [
 [[package]]
 name = "bongterm-mux"
 version = "0.0.0"
+dependencies = [
+ "parking_lot",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "bongterm-process-control"
