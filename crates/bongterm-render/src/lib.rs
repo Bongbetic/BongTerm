@@ -109,10 +109,21 @@ pub trait RendererBackend: Send + Sync {
 /// Drop-and-recreate threshold for the glyph atlas (128 MB per ADR-004).
 pub const ATLAS_VRAM_CEILING_BYTES: u64 = 128 * 1024 * 1024;
 
+/// Warn-via-ledger threshold for atlas VRAM (64 MB per ADR-004).
+pub const ATLAS_VRAM_WARN_BYTES: u64 = 64 * 1024 * 1024;
+
 /// Returns `true` if estimated atlas VRAM meets or exceeds the ceiling.
+/// Caller must drop and recreate the atlas when this returns true.
 #[must_use]
 pub fn atlas_vram_exceeded(current_bytes: u64) -> bool {
     current_bytes >= ATLAS_VRAM_CEILING_BYTES
+}
+
+/// Returns `true` if estimated atlas VRAM meets or exceeds the warn threshold.
+/// Caller should emit a ledger alert; rendering continues.
+#[must_use]
+pub fn atlas_vram_warn_exceeded(current_bytes: u64) -> bool {
+    current_bytes >= ATLAS_VRAM_WARN_BYTES
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +321,7 @@ struct MockState {
     last_snapshot_id: Option<SnapshotId>,
     frames_rendered: u64,
     vram_budget: u64,
+    vram_used_bytes: u64,
     device_lost: bool,
 }
 
@@ -354,6 +366,15 @@ impl MockRendererBackend {
     /// Panics if the internal mutex is poisoned.
     pub fn force_device_loss(&self) {
         self.state.lock().unwrap().device_lost = true;
+    }
+
+    /// Sets mock VRAM usage returned by `collect_metrics`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    pub fn set_mock_vram_used(&self, bytes: u64) {
+        self.state.lock().unwrap().vram_used_bytes = bytes;
     }
 }
 
@@ -405,7 +426,7 @@ impl RendererBackend for MockRendererBackend {
         let s = self.state.lock().unwrap();
         RendererMetrics {
             frames_rendered: s.frames_rendered,
-            vram_used_bytes: 0,
+            vram_used_bytes: s.vram_used_bytes,
             glyphs_cached: 0,
         }
     }
@@ -496,6 +517,50 @@ mod tests {
         ];
         let total: u32 = regions.iter().map(dirty_region_quad_count).sum();
         assert_eq!(total, 16);
+    }
+
+    // --- 1.C.5: VRAM ceiling enforcement ---
+
+    #[test]
+    fn atlas_vram_warn_threshold_is_64_mb() {
+        assert_eq!(ATLAS_VRAM_WARN_BYTES, 64 * 1024 * 1024);
+    }
+
+    #[test]
+    fn warn_threshold_not_exceeded_below_64_mb() {
+        assert!(!atlas_vram_warn_exceeded(ATLAS_VRAM_WARN_BYTES - 1));
+    }
+
+    #[test]
+    fn warn_threshold_exceeded_at_and_above_64_mb() {
+        assert!(atlas_vram_warn_exceeded(ATLAS_VRAM_WARN_BYTES));
+        assert!(atlas_vram_warn_exceeded(ATLAS_VRAM_WARN_BYTES + 1));
+    }
+
+    #[test]
+    fn warn_threshold_is_below_ceiling() {
+        assert!(ATLAS_VRAM_WARN_BYTES < ATLAS_VRAM_CEILING_BYTES);
+    }
+
+    #[test]
+    fn mock_reports_configured_vram_usage() {
+        let mock = MockRendererBackend::new();
+        mock.set_mock_vram_used(70 * 1024 * 1024);
+        assert_eq!(mock.collect_metrics().vram_used_bytes, 70 * 1024 * 1024);
+    }
+
+    #[test]
+    fn mock_vram_usage_triggers_warn_predicate() {
+        let mock = MockRendererBackend::new();
+        mock.set_mock_vram_used(ATLAS_VRAM_WARN_BYTES);
+        assert!(atlas_vram_warn_exceeded(mock.collect_metrics().vram_used_bytes));
+    }
+
+    #[test]
+    fn mock_vram_usage_triggers_ceiling_predicate() {
+        let mock = MockRendererBackend::new();
+        mock.set_mock_vram_used(ATLAS_VRAM_CEILING_BYTES);
+        assert!(atlas_vram_exceeded(mock.collect_metrics().vram_used_bytes));
     }
 
     // --- 1.C.4: device-loss recovery ---

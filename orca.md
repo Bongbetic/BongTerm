@@ -120,8 +120,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 - [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
-- [next] 1.C.5 VRAM ceiling enforcement
-- 1.D.1 Pane + tab model in `bongterm-mux` over vendored `wezterm-mux`
+- [next] 1.D.1 Pane + tab model in `bongterm-mux` over vendored `wezterm-mux`
 - 1.D.2 Split h/v, resize, focus cycle
 - 1.D.3 Layout save/restore (workspace only, no detach daemon)
 - 1.E.1 Shell-integration OSC consumer in `bongterm-blocks`
