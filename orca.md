@@ -119,9 +119,8 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 **Implementation outline:**
 
 - [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
-- [next] 1.C.2 Shared glyph atlas with LRU eviction per ADR-004
 - 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
-- 1.C.3 Frame pacing controller respecting backpressure
+- [next] 1.C.3 Frame pacing controller respecting backpressure
 - 1.C.4 Renderer device-loss recovery (DXGI device-removed)
 - 1.C.5 VRAM ceiling enforcement
 - 1.D.1 Pane + tab model in `bongterm-mux` over vendored `wezterm-mux`

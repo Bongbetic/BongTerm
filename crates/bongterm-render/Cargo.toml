@@ -9,5 +9,6 @@ publish = false
 [dependencies]
 thiserror = { workspace = true }
 iced = { workspace = true }
+cryoglyph = { workspace = true }
 
 [dev-dependencies]

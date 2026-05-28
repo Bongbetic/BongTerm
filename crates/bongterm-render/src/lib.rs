@@ -103,6 +103,19 @@ pub trait RendererBackend: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
+// Atlas VRAM ceiling (ADR-004)
+// ---------------------------------------------------------------------------
+
+/// Drop-and-recreate threshold for the glyph atlas (128 MB per ADR-004).
+pub const ATLAS_VRAM_CEILING_BYTES: u64 = 128 * 1024 * 1024;
+
+/// Returns `true` if estimated atlas VRAM meets or exceeds the ceiling.
+#[must_use]
+pub fn atlas_vram_exceeded(current_bytes: u64) -> bool {
+    current_bytes >= ATLAS_VRAM_CEILING_BYTES
+}
+
+// ---------------------------------------------------------------------------
 // Cell NDC helpers
 // ---------------------------------------------------------------------------
 
@@ -168,26 +181,35 @@ impl TerminalPrimitive {
     }
 }
 
-/// GPU-side state: wgpu pipeline, vertex buffers, glyph atlas.
+/// GPU-side state: shared cryoglyph atlas + renderer (ADR-004 + ADR-005).
 ///
 /// Created once by Iced on first [`TerminalPrimitive`] encounter (ADR-005 §1).
-/// Phase 1.C.2 adds `wgpu::RenderPipeline`, buffers, and cryoglyph `TextAtlas`.
-#[derive(Debug)]
+/// Phase 1.C.3 will wire `prepare`/`draw` to actually render glyphs.
 pub struct TerminalPipeline {
-    // Phase 1.C.2: wgpu::RenderPipeline, vertex/index buffers, TextAtlas
+    atlas: cryoglyph::TextAtlas,
+    #[allow(dead_code)] // Phase 1.C.3 wires prepare()/draw()
+    renderer: cryoglyph::TextRenderer,
 }
 
 impl iced::widget::shader::Pipeline for TerminalPipeline {
     fn new(
-        _device: &iced::wgpu::Device,
-        _queue: &iced::wgpu::Queue,
-        _format: iced::wgpu::TextureFormat,
+        device: &iced::wgpu::Device,
+        queue: &iced::wgpu::Queue,
+        format: iced::wgpu::TextureFormat,
     ) -> Self {
-        Self {}
+        let cache = cryoglyph::Cache::new(device);
+        let mut atlas = cryoglyph::TextAtlas::new(device, queue, &cache, format);
+        let renderer = cryoglyph::TextRenderer::new(
+            &mut atlas,
+            device,
+            iced::wgpu::MultisampleState::default(),
+            None, // no depth stencil for terminal rendering
+        );
+        Self { atlas, renderer }
     }
 
     fn trim(&mut self) {
-        // Phase 1.C.2: trim glyph atlas LRU entries per ADR-004
+        self.atlas.trim();
     }
 }
 
@@ -202,7 +224,7 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
         _bounds: &iced::Rectangle,
         _viewport: &iced::widget::shader::Viewport,
     ) {
-        // Phase 1.C.2: upload dirty cells via queue.write_buffer
+        // Phase 1.C.3: upload dirty cells via pipeline.renderer.prepare()
     }
 
     fn draw(
@@ -210,7 +232,7 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
         _pipeline: &Self::Pipeline,
         _render_pass: &mut iced::wgpu::RenderPass<'_>,
     ) -> bool {
-        // Phase 1.C.2: wgpu draw calls in Iced's RenderPass (ADR-005)
+        // Phase 1.C.3: pipeline.renderer.render(render_pass, &pipeline.atlas, ...)
         true
     }
 }
@@ -354,6 +376,20 @@ mod tests {
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.collect_metrics().frames_rendered, 1);
+    }
+
+    // --- 1.C.2: glyph atlas ceiling ---
+
+    #[test]
+    fn atlas_vram_ceiling_is_128_mb() {
+        assert_eq!(ATLAS_VRAM_CEILING_BYTES, 128 * 1024 * 1024);
+    }
+
+    #[test]
+    fn atlas_vram_exceeded_at_and_above_ceiling() {
+        assert!(!atlas_vram_exceeded(ATLAS_VRAM_CEILING_BYTES - 1));
+        assert!(atlas_vram_exceeded(ATLAS_VRAM_CEILING_BYTES));
+        assert!(atlas_vram_exceeded(ATLAS_VRAM_CEILING_BYTES + 1));
     }
 
     // --- 1.C.1: cell NDC + TerminalPrimitive ---
