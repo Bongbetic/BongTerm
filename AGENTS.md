@@ -9,6 +9,8 @@ This file defines the minimal workflow for Codex Phase 2 execution in this repo.
 - Do not batch tasks.
 - Do not continue to the next task after finishing the active one.
 - Do not implement Phase 3, Phase 4, or later features while working a Phase 2 task.
+- Start every Codex session in a separate git worktree dedicated to that session/task.
+- Do not run a Phase 2 task from the primary checkout when a separate worktree is available.
 
 ## Required Reads
 
@@ -24,8 +26,11 @@ Avoid loading unrelated phases, broad repo context, or large files unless the ac
 ## Execution Rules
 
 - Follow the task's RED/GREEN/TDD steps exactly in the order written.
+- Before running RED, create or switch to a dedicated session worktree and branch (for example `codex/<task-id>-<short-name>`).
 - Run the task-specific failing test first.
 - After the task passes, run only the broader checks required by that task.
+- Once task tests are GREEN, push the session worktree branch and merge it into `main`.
+- If the expected RED step is not reproducible (the test does not fail when it should), stop and ask the user for instructions before continuing.
 - Stop when the active task is complete or blocked. Do not start the next task.
 - Keep edits limited to the task's declared files and any required test wiring.
 - Push a task branch/worktree only after the task is GREEN and all task-required tests/checks pass.
