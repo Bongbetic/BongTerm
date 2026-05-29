@@ -7,5 +7,9 @@ license.workspace = true
 publish = false
 
 [dependencies]
+parking_lot = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true }
 
 [dev-dependencies]
