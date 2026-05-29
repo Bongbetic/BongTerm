@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.A.4b + 1.C.1-5 + 1.D.1-3 + 1.E.1-4 + 1.F.1-4 + 1.G.1-4 done; `[next]` = 1.B.3 (deferred — needs user approval) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete (1.A.4b + 1.B.3 + 1.C.1-5 + 1.D.1-3 + 1.E.1-4 + 1.F.1-4 + 1.G.1-4); `[next]` = 1.exit (CI gate wiring) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 📋 Planned (17 tasks) | — | §6.1 #15,#24 green |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
@@ -44,7 +44,6 @@
 
 ### Key known issues / deferred items
 
-- **wezterm submodule gitlink** not created — `vendor/wezterm/.gitkeep` removed; fix cmd in `docs/adr/0007-wezterm-submodule.md` § "Fix required before Phase 1.B.3"
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
 - **CJK IME round-trip** — harness written (`cargo run -p s3b-ime-composition`); live test deferred to Phase 5 gate §6.1 #21
@@ -118,15 +117,6 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 **Implementation outline:**
 
-- [block](user approval required) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term
-  *Gitlink fix attempted (2026-05-29) — shallow clone of `20240203-110809-5046fc22` succeeded but
-  staging `vendor/wezterm` as a compiled dependency requires explicit user authorization (untrusted
-  code integration gate). Files are in `vendor/wezterm/` as untracked. User must run:*
-  ```sh
-  git add vendor/wezterm .gitmodules
-  git commit -m "chore(vendor): register wezterm submodule gitlink at 20240203-110809-5046fc22"
-  ```
-  *then wire `WezTermAdapter` to `wezterm_term::Terminal::advance_bytes` per ADR-007.*
 - [next] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
