@@ -11,6 +11,8 @@ use bongterm_settings::{KeybindingSettings, Settings};
 use iced::widget::{button, column, container, row, stack, text, text_input};
 use iced::{Element, Length, Task, Theme};
 
+pub mod agent_sidebar;
+
 pub type ShellResult = iced::Result;
 
 // ---------------------------------------------------------------------------
@@ -365,6 +367,17 @@ pub enum ShellMessage {
     PaletteExecuteSelected,
     OnboardingAdvance,
     OnboardingFinish,
+    AgentLifecycle {
+        run_id: String,
+        control: agent_sidebar::LifecycleControl,
+    },
+    AgentInterrupt {
+        run_id: String,
+    },
+    ApprovalResolve {
+        approval_id: u64,
+        approve: bool,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +540,11 @@ impl BongTermShell {
             ShellMessage::OnboardingFinish => {
                 self.settings.onboarding.completed = true;
                 self.onboarding_active = false;
+            }
+            ShellMessage::AgentLifecycle { .. }
+            | ShellMessage::AgentInterrupt { .. }
+            | ShellMessage::ApprovalResolve { .. } => {
+                // Routed by app layer to agent supervisor; shell view is no-op.
             }
         }
 
