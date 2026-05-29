@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.C.1-5 + 1.D.1-2 done; `[next]` = 1.D.3 | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — 1.A.4b + 1.C.1-5 + 1.D.1-3 + 1.E.1-4 + 1.F.1-4 + 1.G.1-4 done; `[next]` = 1.B.3 (deferred — needs user approval) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 📋 Planned (17 tasks) | — | §6.1 #15,#24 green |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
@@ -118,22 +118,16 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 **Implementation outline:**
 
-- [block](wezterm submodule gitlink) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term *(fix submodule gitlink first — see ADR-007)*
-- 1.A.4b Persist onboarding choices to disk (SettingsWriter port + `FileSettingsProvider::write`)
-- [next] 1.D.3 Layout save/restore (workspace only, no detach daemon)
-- 1.E.1 Shell-integration OSC consumer in `bongterm-blocks`
-- 1.E.2 Confidence model: High / Medium / Low / Unsupported per shell
-- 1.E.3 Block boundary detection + tests against `tests/fixtures/osc/`
-- 1.E.4 Block actions: copy / rerun / attach / save snippet
-- 1.F.1 Resource dashboard Iced view
-- 1.F.2 `bongterm-ledger` 1 Hz sampler (CPU, RSS, IO, handles)
-- 1.F.3 VRAM sampling via DXGI `QueryVideoMemoryInfo`
-- 1.F.4 Per-process attribution: BongT / shell / conhost / agent / MCP / plugin-zero
-- 1.G.1 SQLite WAL + migration runner + `0001_init.sql`
-- 1.G.2 Sidecar chunk writer (blake3 + monotonic IDs + retention)
-- 1.G.3 Crash recovery scan on startup
-- 1.G.4 `xtask cleanup-chunks` real impl
-- 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
+- [block](user approval required) 1.B.3 `WezTermAdapter::ingest_bytes` real wiring to wezterm-term
+  *Gitlink fix attempted (2026-05-29) — shallow clone of `20240203-110809-5046fc22` succeeded but
+  staging `vendor/wezterm` as a compiled dependency requires explicit user authorization (untrusted
+  code integration gate). Files are in `vendor/wezterm/` as untracked. User must run:*
+  ```sh
+  git add vendor/wezterm .gitmodules
+  git commit -m "chore(vendor): register wezterm submodule gitlink at 20240203-110809-5046fc22"
+  ```
+  *then wire `WezTermAdapter` to `wezterm_term::Terminal::advance_bytes` per ADR-007.*
+- [next] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
 ---
