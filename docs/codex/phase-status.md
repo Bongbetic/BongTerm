@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase2.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: `2.B.4`
+Current focus: `2.C.2a`
 
 | Task ID | Status | Last test run | Notes/blockers | Next task |
 | --- | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ Current focus: `2.B.4`
 | 2.B.2 | Complete | `cargo test -p bongterm-agents file_change::` (pass, 4 tests) | RED observed first (`parse_porcelain_v1`/`ChangeStatus`/`GitPorcelainTracker` missing), then GREEN after implementing `file_change.rs` porcelain-v1 parser + snapshot diff attribution + injectable git runner | 2.B.3 |
 | 2.B.3 | Complete | `cargo test -p bongterm-agents approval::` (pass, 4 tests) | RED observed first (`ApprovalQueue`/`ApprovalDecision`/`ApprovalState` missing), then GREEN after implementing `approval.rs` policy-routed `ApprovalQueue` with explicit `EnforcementLevel` labels and deny-never-approvable resolution rule | 2.B.4 |
 | 2.B.4 | Complete | `cargo test -p bongterm-agents replay_` (pass, 4 tests) | RED observed first (`ReplayBuilder` missing), then GREEN after implementing `replay.rs` `ReplayBuilder` + `ReplaySpec` prefilled summary context replay | 2.C.2a |
-| 2.C.2a | Not started | Not run | - | 2.C.1 |
+| 2.C.2a | Complete | `cargo test -p bongterm-agents lifecycle::` (pass, 7 tests) | Previously blocked by missing `ReplayBuilder` in `replay.rs`; rerun after replay implementation sync is GREEN | 2.C.1 |
 | 2.C.1 | Not started | Not run | - | 2.C.3a |
 | 2.C.3a | Not started | Not run | - | 2.C.3b |
 | 2.C.3b | Not started | Not run | - | 2.C.3c |
