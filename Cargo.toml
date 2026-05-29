@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/wezterm"]
 members = [
     "crates/bongterm-app",
     "crates/bongterm-ui",
