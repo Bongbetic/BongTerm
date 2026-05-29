@@ -28,6 +28,8 @@ Avoid loading unrelated phases, broad repo context, or large files unless the ac
 - After the task passes, run only the broader checks required by that task.
 - Stop when the active task is complete or blocked. Do not start the next task.
 - Keep edits limited to the task's declared files and any required test wiring.
+- Push a task branch/worktree only after the task is GREEN and all task-required tests/checks pass.
+- If the task is not GREEN or required checks fail, do not push; wait for explicit user instruction.
 
 ## Architecture Boundaries
 
