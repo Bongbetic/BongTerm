@@ -3,6 +3,17 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
 
+pub mod approval;
+pub mod classify;
+pub mod claude_code;
+pub mod codex_cli;
+pub mod corpus;
+pub mod discover;
+pub mod file_change;
+pub mod lifecycle;
+pub mod replay;
+pub mod transcript;
+
 /// How well `BongTerm` can observe and interact with the agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CapabilityLevel {
@@ -184,6 +195,27 @@ pub trait AgentAdapter: Send + Sync {
 
     /// Create a new output classifier for a run.
     fn create_classifier(&self) -> Box<dyn AgentOutputClassifier>;
+
+    /// Produce a post-run summary suitable for replay pre-fill.
+    /// `tool_calls_made` and `output_bytes` are tallied by the supervisor.
+    fn summarize_exit(
+        &self,
+        exit_state: ExitState,
+        tool_calls_made: u64,
+        output_bytes: u64,
+    ) -> AgentExitSummary {
+        AgentExitSummary {
+            exit_state,
+            tool_calls_made,
+            output_bytes,
+            replay_summary: Some(format!(
+                "Re-run {} ({} tool calls, {} bytes)",
+                self.capabilities().name,
+                tool_calls_made,
+                output_bytes
+            )),
+        }
+    }
 }
 
 use std::sync::{Arc, Mutex};
@@ -349,5 +381,17 @@ mod tests {
         let result = adapter.discover();
         assert!(result.found);
         assert_eq!(result.auth_state, AuthState::Authenticated);
+    }
+
+    #[test]
+    fn mock_adapter_summarize_exit_produces_replay_summary() {
+        let adapter = MockAgentAdapter::new("claude-code", Vec::new());
+        let summary = adapter.summarize_exit(ExitState::Clean { exit_code: 0 }, 3, 1024);
+        assert_eq!(summary.tool_calls_made, 3);
+        assert_eq!(summary.output_bytes, 1024);
+        assert!(
+            summary.replay_summary.is_some(),
+            "summarize_exit must populate replay_summary for replay pre-fill"
+        );
     }
 }

@@ -36,7 +36,7 @@ allowed = ["bongterm-pty", "bongterm-term"]
 allowed = ["bongterm-term"]
 
 [bongterm-agents]
-allowed = ["bongterm-pty", "bongterm-secrets-api", "bongterm-mcp", "bongterm-security", "bongterm-storage-api", "bongterm-ledger", "bongterm-process-control"]
+allowed = ["bongterm-pty", "bongterm-secrets-api", "bongterm-mcp", "bongterm-security", "bongterm-storage-api", "bongterm-ledger", "bongterm-process-control", "bongterm-test-kit"]
 
 [bongterm-mcp]
 allowed = ["bongterm-secrets-api", "bongterm-security", "bongterm-ledger", "bongterm-process-control", "bongterm-storage-api"]
