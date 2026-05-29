@@ -1,5 +1,52 @@
 //! Replay-with-summarized-context.
 
+use crate::{AgentAdapter, AgentError, AgentExitSummary, ProcessSpec};
+
+/// Re-launch specification derived from prior run summary + original prompt.
+#[derive(Debug, Clone)]
+pub struct ReplaySpec {
+    pub cwd: String,
+    pub prefilled_prompt: String,
+}
+
+impl ReplaySpec {
+    /// Build process spec using same adapter and same cwd.
+    pub fn to_process_spec(&self, adapter: &impl AgentAdapter) -> Result<ProcessSpec, AgentError> {
+        adapter.build_process_spec(&self.cwd, &self.prefilled_prompt)
+    }
+}
+
+/// Builds replay specs from original run data.
+pub struct ReplayBuilder {
+    cwd: String,
+    original_prompt: String,
+}
+
+impl ReplayBuilder {
+    #[must_use]
+    pub fn new(cwd: impl Into<String>, original_prompt: impl Into<String>) -> Self {
+        Self {
+            cwd: cwd.into(),
+            original_prompt: original_prompt.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn build(&self, summary: &AgentExitSummary) -> ReplaySpec {
+        let prefilled_prompt = match &summary.replay_summary {
+            Some(context) => format!(
+                "Previous run summary: {context}\n\nOriginal request: {}",
+                self.original_prompt
+            ),
+            None => self.original_prompt.clone(),
+        };
+
+        ReplaySpec {
+            cwd: self.cwd.clone(),
+            prefilled_prompt,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
