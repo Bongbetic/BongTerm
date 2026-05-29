@@ -7,5 +7,14 @@ license.workspace = true
 publish = false
 
 [dependencies]
+bongterm-storage-api = { path = "../bongterm-storage-api" }
+rusqlite = { workspace = true }
+parking_lot = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
 
 [dev-dependencies]
+tempfile = "3"
+bongterm-test-kit = { path = "../bongterm-test-kit" }
