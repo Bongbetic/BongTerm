@@ -389,12 +389,31 @@ fn build_rich_spans(snap: &SurfaceSnapshot) -> Vec<(String, cryoglyph::Attrs<'st
             next_col = run.col.saturating_add(width);
             out.push((run.text.clone(), attrs));
         }
+        // Cursor overlay: a block glyph at the cursor cell, emitted into the same
+        // layout stream so it aligns for free (no separate quad pass). Drawn only
+        // when the cursor sits at or past the row's content end — the dominant
+        // prompt-end case — so it never shifts existing glyphs. Mid-line cursor
+        // positions are a v1 gap, pending the background quad pass.
+        if snap.cursor.visible && usize::from(snap.cursor.row) == r && snap.cursor.col >= next_col {
+            let gap = usize::from(snap.cursor.col - next_col);
+            if gap > 0 {
+                out.push((" ".repeat(gap), base.clone()));
+            }
+            let (cr, cg, cb) = unpack_rgb(CURSOR_RGB);
+            out.push((
+                "\u{2588}".to_string(),
+                base.clone().color(cryoglyph::Color::rgb(cr, cg, cb)),
+            ));
+        }
         if r + 1 < rows {
             out.push(("\n".to_string(), base.clone()));
         }
     }
     out
 }
+
+/// Block-cursor colour (`0x00RRGGBB`), a light grey visible on a dark surface.
+const CURSOR_RGB: u32 = 0x00D0_D0D0;
 
 /// Split a `0x00RRGGBB` colour into its `(r, g, b)` byte components.
 #[allow(clippy::cast_possible_truncation)]
@@ -999,5 +1018,87 @@ mod tests {
         assert_eq!(prim.snapshot().id, SnapshotId(7));
         assert_eq!(prim.dirty().len(), 1);
         assert_eq!(prim.dirty()[0].width, 80);
+    }
+
+    // --- 1.C.x: rich-span layout + cursor overlay ---
+
+    fn spans_text(snap: &SurfaceSnapshot) -> String {
+        build_rich_spans(snap)
+            .iter()
+            .map(|(s, _)| s.as_str())
+            .collect()
+    }
+
+    fn snap_with_cursor(spans: Vec<CellSpan>, cursor: CursorVis) -> SurfaceSnapshot {
+        SurfaceSnapshot {
+            id: SnapshotId(1),
+            cols: 80,
+            rows: 24,
+            spans,
+            cursor,
+        }
+    }
+
+    #[test]
+    fn cursor_block_injected_at_cursor_cell() {
+        let snap = snap_with_cursor(
+            vec![],
+            CursorVis {
+                row: 0,
+                col: 3,
+                visible: true,
+            },
+        );
+        // Empty row 0 → 3 pad spaces then the block cursor glyph.
+        assert!(
+            spans_text(&snap).starts_with("   \u{2588}"),
+            "expected a block cursor at column 3"
+        );
+    }
+
+    #[test]
+    fn cursor_not_drawn_when_hidden() {
+        let snap = snap_with_cursor(
+            vec![],
+            CursorVis {
+                row: 0,
+                col: 3,
+                visible: false,
+            },
+        );
+        assert!(
+            !spans_text(&snap).contains('\u{2588}'),
+            "a hidden cursor must not draw a block"
+        );
+    }
+
+    #[test]
+    fn cursor_block_follows_row_content() {
+        // "hi" occupies cols 0-1; cursor at col 2 lands the block right after it.
+        let snap = snap_with_cursor(
+            vec![CellSpan {
+                row: 0,
+                col: 0,
+                text: "hi".into(),
+                fg: 0x00FF_FFFF,
+                bg: 0,
+                attrs: 0,
+            }],
+            CursorVis {
+                row: 0,
+                col: 2,
+                visible: true,
+            },
+        );
+        assert!(
+            spans_text(&snap).starts_with("hi\u{2588}"),
+            "cursor block should immediately follow 'hi'"
+        );
+    }
+
+    #[test]
+    fn span_foreground_colour_round_trips_to_unpack() {
+        // Guards the fg packing/unpacking the renderer relies on for span colour.
+        assert_eq!(unpack_rgb(0x00AB_CDEF), (0xAB, 0xCD, 0xEF));
     }
 }
