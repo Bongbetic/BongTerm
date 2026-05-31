@@ -28,7 +28,7 @@
 | What did the Wave 0 spikes measure? | `docs/adr/0003-0007` — latency, VRAM, device integration, IME, wezterm API |
 | What are the hard constraints? | `CLAUDE.md` §Hard non-goals, §Security contract, §Terminal hot-path rules |
 | What CI gates exist? | `.github/workflows/` (skeleton) + `CLAUDE.md` §Required CI gates |
-| Memory from past sessions? | `C:\Users\souba\.claude\projects\C--Users-souba-Documents-Projects-BongT\memory\` |
+| Memory from past sessions? | `C:\Users\souba\.claude\projects\D--Programming-Bongbetic-BongT\memory\` |
 
 ### Phase completion status
 
