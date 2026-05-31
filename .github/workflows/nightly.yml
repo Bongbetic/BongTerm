@@ -33,3 +33,7 @@ jobs:
         run: cargo test -p bongterm-app --test gate01_shell_smoke -- --nocapture
       - name: Gate 5 (RSS) — core process RSS within 120 MB budget
         run: cargo test -p bongterm-app --test gate05_rss -- --nocapture
+      - name: Gate 8 — command blocks (fixture corpus replay + detection latency p99 ≤ 5 ms)
+        run: cargo test -p bongterm-blocks -- --nocapture
+      - name: Gate 29 — SQLite + sidecar recovery (torn / checksum / corrupt DB)
+        run: cargo test -p bongterm-storage-sqlite --test gate29_storage_recovery_suite -- --nocapture
