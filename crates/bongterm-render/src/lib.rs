@@ -45,14 +45,51 @@ pub struct DirtyRegion {
     pub height: u16,
 }
 
-/// A minimal surface snapshot passed to the renderer.
+/// A run of identically-styled text positioned on the grid.
+///
+/// Renderer-local mirror of `bongterm-term`'s `CellRun` (spec §1.2: the renderer
+/// must not import `bongterm-term`). `bongterm-app` maps one to the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellSpan {
+    pub row: u16,
+    pub col: u16,
+    pub text: String,
+    /// Foreground colour, `0x00RRGGBB`.
+    pub fg: u32,
+    /// Background colour, `0x00RRGGBB`.
+    pub bg: u32,
+    /// Attribute bitfield: bold, italic, underline, blink, reverse, strikethrough.
+    pub attrs: u32,
+}
+
+/// Cursor position + visibility for the renderer's cursor overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CursorVis {
+    pub row: u16,
+    pub col: u16,
+    pub visible: bool,
+}
+
+/// Attribute bit positions for [`CellSpan::attrs`] (mirror of `bongterm-term`).
+pub mod attr {
+    pub const BOLD: u32 = 1 << 0;
+    pub const ITALIC: u32 = 1 << 1;
+    pub const UNDERLINE: u32 = 1 << 2;
+    pub const BLINK: u32 = 1 << 3;
+    pub const REVERSE: u32 = 1 << 4;
+    pub const STRIKETHROUGH: u32 = 1 << 5;
+}
+
+/// A surface snapshot passed to the renderer: styled text runs + cursor.
 #[derive(Debug, Clone)]
 pub struct SurfaceSnapshot {
     pub id: SnapshotId,
     pub cols: u16,
     pub rows: u16,
-    /// Flat grid: row-major, cols*rows entries.
-    pub cells: Vec<u32>, // simplified: just codepoints for scaffold
+    /// Styled text runs, one per contiguous same-style cell range.
+    pub spans: Vec<CellSpan>,
+    /// Cursor position + visibility.
+    pub cursor: CursorVis,
 }
 
 /// Metrics collected from the renderer.
@@ -299,29 +336,74 @@ impl iced::widget::shader::Pipeline for TerminalPipeline {
     }
 }
 
-/// Lay the snapshot's row-major codepoints out as one `\n`-joined string.
+/// Build the rich-text span stream (`(text, Attrs)` pairs) for `set_rich_text`.
 ///
-/// Cell `0` and control codepoints render as a space; trailing spaces per row
-/// are trimmed so the shaper does not pad runs. This is the scaffold's lossy
-/// text view (no colour/attributes yet) — enough to put glyphs on screen.
-#[must_use]
-fn snapshot_to_text(snap: &SurfaceSnapshot) -> String {
-    let cols = snap.cols as usize;
+/// Spans are laid out row by row: within a row, runs are emitted in column
+/// order with padding spaces inserting any column gap, and each run carries its
+/// own foreground colour, weight (bold), and slant (italic). A `\n` separates
+/// rows — `cosmic-text` splits the stream into lines on those newlines.
+///
+/// Strings are returned owned alongside their `Attrs` so the caller can hand
+/// `set_rich_text` borrowed slices that outlive the call.
+fn build_rich_spans(snap: &SurfaceSnapshot) -> Vec<(String, cryoglyph::Attrs<'static>)> {
     let rows = snap.rows as usize;
-    let mut out = String::with_capacity((cols + 1) * rows);
-    for r in 0..rows {
-        let mut line = String::with_capacity(cols);
-        for c in 0..cols {
-            let cp = snap.cells.get(r * cols + c).copied().unwrap_or(0);
-            let ch = char::from_u32(cp).filter(|c| !c.is_control());
-            line.push(ch.unwrap_or(' '));
+    let base = cryoglyph::Attrs::new().family(cryoglyph::Family::Monospace);
+
+    // Bucket runs by row, then sort each row by starting column.
+    let mut by_row: Vec<Vec<&CellSpan>> = vec![Vec::new(); rows];
+    for span in &snap.spans {
+        let r = span.row as usize;
+        if r < rows {
+            by_row[r].push(span);
         }
-        out.push_str(line.trim_end());
+    }
+
+    let mut out: Vec<(String, cryoglyph::Attrs<'static>)> = Vec::new();
+    for (r, mut runs) in by_row.into_iter().enumerate() {
+        runs.sort_by_key(|s| s.col);
+        let mut next_col: u16 = 0;
+        for run in runs {
+            if run.col > next_col {
+                let gap = usize::from(run.col - next_col);
+                out.push((" ".repeat(gap), base.clone()));
+            }
+            let (rr, gg, bb) = unpack_rgb(run.fg);
+            let weight = if run.attrs & attr::BOLD != 0 {
+                cryoglyph::Weight::BOLD
+            } else {
+                cryoglyph::Weight::NORMAL
+            };
+            let style = if run.attrs & attr::ITALIC != 0 {
+                cryoglyph::Style::Italic
+            } else {
+                cryoglyph::Style::Normal
+            };
+            let attrs = base
+                .clone()
+                .color(cryoglyph::Color::rgb(rr, gg, bb))
+                .weight(weight)
+                .style(style);
+            // Next free column = this run's column + its width. Char count is a
+            // close-enough proxy for monospace advance; wide glyphs refine later.
+            let width = u16::try_from(run.text.chars().count()).unwrap_or(u16::MAX);
+            next_col = run.col.saturating_add(width);
+            out.push((run.text.clone(), attrs));
+        }
         if r + 1 < rows {
-            out.push('\n');
+            out.push(("\n".to_string(), base.clone()));
         }
     }
     out
+}
+
+/// Split a `0x00RRGGBB` colour into its `(r, g, b)` byte components.
+#[allow(clippy::cast_possible_truncation)]
+const fn unpack_rgb(c: u32) -> (u8, u8, u8) {
+    (
+        ((c >> 16) & 0xFF) as u8,
+        ((c >> 8) & 0xFF) as u8,
+        (c & 0xFF) as u8,
+    )
 }
 
 impl iced::widget::shader::Primitive for TerminalPrimitive {
@@ -343,7 +425,7 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
         bounds: &iced::Rectangle,
         viewport: &iced::widget::shader::Viewport,
     ) {
-        let text = snapshot_to_text(&self.snapshot);
+        let spans = build_rich_spans(&self.snapshot);
 
         // The shader render pass covers the whole physical surface; positions and
         // the cryoglyph viewport are in physical pixels, so scale logical bounds.
@@ -370,11 +452,11 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
             Some(bounds.width.max(1.0)),
             Some(bounds.height.max(1.0)),
         );
-        let attrs = cryoglyph::Attrs::new().family(cryoglyph::Family::Monospace);
-        buffer.set_text(
+        let default_attrs = cryoglyph::Attrs::new().family(cryoglyph::Family::Monospace);
+        buffer.set_rich_text(
             &mut pipeline.font_system,
-            &text,
-            &attrs,
+            spans.iter().map(|(s, a)| (s.as_str(), a.clone())),
+            &default_attrs,
             cryoglyph::Shaping::Advanced,
             None,
         );
@@ -571,7 +653,8 @@ mod tests {
             id: SnapshotId(42),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.last_snapshot_id(), Some(SnapshotId(42)));
@@ -584,7 +667,8 @@ mod tests {
             id: SnapshotId(1),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         mock.render_frame(&snapshot, &[]).unwrap();
@@ -598,7 +682,8 @@ mod tests {
             id: SnapshotId(0),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         assert_eq!(mock.collect_metrics().frames_rendered, 1);
@@ -718,7 +803,8 @@ mod tests {
             id: SnapshotId(1),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         let err = mock.render_frame(&snapshot, &[]).unwrap_err();
         assert!(matches!(err, RenderError::DeviceLost));
@@ -731,7 +817,8 @@ mod tests {
             id: SnapshotId(1),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         mock.render_frame(&snapshot, &[]).unwrap();
         mock.force_device_loss();
@@ -772,7 +859,8 @@ mod tests {
             id: SnapshotId(5),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         let (_, regions) = pacer.take().unwrap();
         fresh.render_frame(&snapshot, &regions).unwrap();
@@ -898,7 +986,8 @@ mod tests {
             id: SnapshotId(7),
             cols: 80,
             rows: 24,
-            cells: vec![],
+            spans: vec![],
+            cursor: CursorVis::default(),
         };
         let dirty = vec![DirtyRegion {
             col: 0,

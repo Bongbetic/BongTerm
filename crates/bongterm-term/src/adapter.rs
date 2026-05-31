@@ -81,24 +81,34 @@ impl WezTermAdapter {
     pub fn current_snapshot(&mut self) -> SurfaceSnapshot {
         self.seq += 1;
 
-        // v1: one run per non-blank visible row, default colors/attrs. Colour and
-        // per-cell attribute extraction is deferred (the renderer ignores them
-        // for now). A fresh terminal has no scrollback, so phys rows 0..rows map
-        // to the visible screen.
+        // Real per-run colour + attribute extraction. `Line::cluster` walks the
+        // cells and groups successive cells with identical attributes into runs,
+        // each carrying its starting column (`first_cell_idx`). Colours resolve
+        // through the terminal's active palette so SGR 30-37/90-97, 256-colour,
+        // and 24-bit truecolor all land correctly. A fresh terminal has no
+        // scrollback, so phys rows 0..rows map to the visible screen.
+        let palette = self.terminal.palette();
         let rows = self.rows as usize;
         let lines = self.terminal.screen().lines_in_phys_range(0..rows);
         let mut runs = Vec::new();
         for (row, line) in lines.iter().enumerate() {
-            let text = line.as_str();
-            let trimmed = text.trim_end();
-            if !trimmed.is_empty() {
+            let row = u32::try_from(row).unwrap_or(u32::MAX);
+            for cluster in line.cluster(None) {
+                // Skip all-space runs on the default background — nothing visible
+                // to draw. Background-coloured whitespace is revisited when the
+                // renderer's background quad pass lands.
+                if cluster.text.chars().all(|c| c == ' ') {
+                    continue;
+                }
+                let fg = pack_rgb(palette.resolve_fg(cluster.attrs.foreground()).to_srgb_u8());
+                let bg = pack_rgb(palette.resolve_bg(cluster.attrs.background()).to_srgb_u8());
                 runs.push(CellRun {
-                    row: u32::try_from(row).unwrap_or(u32::MAX),
-                    start_col: 0,
-                    text: trimmed.to_string(),
-                    fg: 0x00FF_FFFF,
-                    bg: 0,
-                    attrs: 0,
+                    row,
+                    start_col: u32::try_from(cluster.first_cell_idx).unwrap_or(0),
+                    text: cluster.text,
+                    fg,
+                    bg,
+                    attrs: pack_attrs(&cluster.attrs),
                 });
             }
         }
@@ -119,6 +129,33 @@ impl WezTermAdapter {
             seq: self.seq,
         }
     }
+}
+
+/// Pack a resolved sRGB colour `(r, g, b, a)` into `0x00RRGGBB` (alpha dropped).
+fn pack_rgb(rgb: (u8, u8, u8, u8)) -> u32 {
+    (u32::from(rgb.0) << 16) | (u32::from(rgb.1) << 8) | u32::from(rgb.2)
+}
+
+/// Pack a cell's SGR attributes into the [`crate::surface::attr`] bitfield.
+fn pack_attrs(a: &wezterm_term::CellAttributes) -> u32 {
+    use crate::surface::attr;
+    let mut bits = 0;
+    if matches!(a.intensity(), wezterm_term::Intensity::Bold) {
+        bits |= attr::BOLD;
+    }
+    if a.italic() {
+        bits |= attr::ITALIC;
+    }
+    if !matches!(a.underline(), wezterm_term::Underline::None) {
+        bits |= attr::UNDERLINE;
+    }
+    if a.reverse() {
+        bits |= attr::REVERSE;
+    }
+    if a.strikethrough() {
+        bits |= attr::STRIKETHROUGH;
+    }
+    bits
 }
 
 #[cfg(test)]
@@ -185,6 +222,60 @@ mod tests {
             joined.contains("hello world"),
             "snapshot runs must contain ingested text, got: {joined:?}"
         );
+    }
+
+    #[test]
+    fn snapshot_extracts_truecolor_foreground() {
+        let mut a = WezTermAdapter::new(80, 24);
+        // SGR 38;2;r;g;b sets a 24-bit truecolor foreground; resolve_fg returns it
+        // verbatim, so the packed value is exactly 0xFF0000.
+        a.ingest_bytes(b"\x1b[38;2;255;0;0mRED\x1b[0m");
+        let snap = a.current_snapshot();
+        let run = snap
+            .runs
+            .iter()
+            .find(|r| r.text.contains("RED"))
+            .expect("a run containing RED");
+        assert_eq!(
+            run.fg & 0x00FF_FFFF,
+            0x00FF_0000,
+            "truecolor foreground should pack to pure red, got {:#08x}",
+            run.fg
+        );
+    }
+
+    #[test]
+    fn snapshot_extracts_bold_and_underline_attrs() {
+        use crate::surface::attr;
+        let mut a = WezTermAdapter::new(80, 24);
+        a.ingest_bytes(b"\x1b[1;4mBU\x1b[0m");
+        let snap = a.current_snapshot();
+        let run = snap
+            .runs
+            .iter()
+            .find(|r| r.text.contains("BU"))
+            .expect("a run containing BU");
+        assert_ne!(run.attrs & attr::BOLD, 0, "bold bit should be set");
+        assert_ne!(
+            run.attrs & attr::UNDERLINE,
+            0,
+            "underline bit should be set"
+        );
+    }
+
+    #[test]
+    fn plain_text_run_starts_at_its_column() {
+        // "  hi" — the two leading spaces form their own (skipped) cluster, so the
+        // "hi" run must report start_col = 2, preserving indentation.
+        let mut a = WezTermAdapter::new(80, 24);
+        a.ingest_bytes(b"  hi");
+        let snap = a.current_snapshot();
+        let run = snap
+            .runs
+            .iter()
+            .find(|r| r.text.contains("hi"))
+            .expect("a run containing hi");
+        assert_eq!(run.start_col, 2, "leading spaces must offset start_col");
     }
 
     /// Feed plain ASCII bytes; verify the terminal model reflects the text on row 0.

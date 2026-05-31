@@ -174,34 +174,37 @@ impl iced::widget::shader::Program<Message> for TerminalProgram {
     }
 }
 
-/// Convert the terminal-core snapshot (text runs) into the renderer's
-/// row-major codepoint grid. Lossy for now (no colour/attributes) — enough to
-/// drive the real renderer. Multi-width glyphs advance one column (refined later).
-// u32->u16 grid dims are window-bounded; truncation cannot occur in practice.
-#[allow(clippy::cast_possible_truncation)]
+/// Convert the terminal-core snapshot into the renderer's styled-span snapshot.
+///
+/// Each `bongterm-term` `CellRun` maps to a renderer `CellSpan`, carrying its
+/// foreground/background colour and attribute bits (the two crates share an
+/// identical attr bit layout). The cursor position and the monotonic `seq`
+/// (reused as the renderer's `SnapshotId`, for later change detection) carry
+/// through too. Grid dims are window-bounded, so the `u32`→`u16` conversions
+/// never actually saturate.
 fn to_render_snapshot(term: &SurfaceSnapshot) -> bongterm_render::SurfaceSnapshot {
-    let w = term.cols as usize;
-    let h = term.rows as usize;
-    let mut cells = vec![0u32; w.saturating_mul(h)];
-    for run in &term.runs {
-        let r = run.row as usize;
-        if r >= h {
-            continue;
-        }
-        let base = run.start_col as usize;
-        for (i, ch) in run.text.chars().enumerate() {
-            let c = base + i;
-            if c >= w {
-                break;
-            }
-            cells[r * w + c] = ch as u32;
-        }
-    }
+    let spans = term
+        .runs
+        .iter()
+        .map(|run| bongterm_render::CellSpan {
+            row: u16::try_from(run.row).unwrap_or(u16::MAX),
+            col: u16::try_from(run.start_col).unwrap_or(u16::MAX),
+            text: run.text.clone(),
+            fg: run.fg,
+            bg: run.bg,
+            attrs: run.attrs,
+        })
+        .collect();
     bongterm_render::SurfaceSnapshot {
-        id: bongterm_render::SnapshotId(0),
-        cols: term.cols as u16,
-        rows: term.rows as u16,
-        cells,
+        id: bongterm_render::SnapshotId(term.seq),
+        cols: u16::try_from(term.cols).unwrap_or(u16::MAX),
+        rows: u16::try_from(term.rows).unwrap_or(u16::MAX),
+        spans,
+        cursor: bongterm_render::CursorVis {
+            row: u16::try_from(term.cursor.position.row).unwrap_or(0),
+            col: u16::try_from(term.cursor.position.col).unwrap_or(0),
+            visible: term.cursor.visible,
+        },
     }
 }
 

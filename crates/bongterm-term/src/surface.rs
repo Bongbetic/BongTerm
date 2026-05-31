@@ -5,6 +5,20 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Cell attribute bit positions for [`CellRun::attrs`].
+///
+/// A bitfield rather than a struct so a run's formatting fits one `u32` and
+/// crosses the `bongterm-render` boundary without pulling in `termwiz` types
+/// (spec §1.2 ownership: render consumes only `bongterm-term` surface types).
+pub mod attr {
+    pub const BOLD: u32 = 1 << 0;
+    pub const ITALIC: u32 = 1 << 1;
+    pub const UNDERLINE: u32 = 1 << 2;
+    pub const BLINK: u32 = 1 << 3;
+    pub const REVERSE: u32 = 1 << 4;
+    pub const STRIKETHROUGH: u32 = 1 << 5;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CellPosition {
     pub row: u32,
