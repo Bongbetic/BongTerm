@@ -35,25 +35,25 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete; **`ci.yml` green _locally_ on stable 1.95** (fmt/clippy/deny/test/check-deps/release/submodule), but **CI itself has not run** — `ci.yml` triggers on `push:[main]`+PRs and the branch is `master`; `.gitattributes eol=lf` added to survive Windows CI checkout. Commits `ccef9ca`→`31f44ae`. `[next]` = 1.exit = wire the Phase-1 **perf** gates into `nightly.yml` (unstarted) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95 (CI not yet run; `master`-vs-`main` trigger mismatch). **`1.exit` measurable subset done** (gates #1,#5-RSS,#8,#28,#29 built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4,#5-VRAM,#6,#7,#17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; `[next]` = `2.replan` | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-05-31, HEAD `31f44ae`, tree clean)
+### Current status (2026-05-31, HEAD `2e0947e`, tree clean)
 
-- Working tree clean; one worktree (main); submodule `vendor/wezterm` clean at `5046fc22`; no stash.
-- `ci.yml` passes all 7 steps **in a local stable-1.95 reproduction**; not yet confirmed on GitHub CI (see trigger mismatch below).
-- `nightly.yml`: gates **#15 + #24 wired and green**; Phase-1 perf gates **not wired** (= `1.exit`, `[next]`).
-- Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md` (Update 3).
+- Working tree clean; submodule `vendor/wezterm` clean at `5046fc22` (has untracked `graphify-out/` noise inside it — ignore); stray untracked `.repograph/` at root (tool artifact, not committed).
+- `ci.yml` passes all 7 steps **in a local stable-1.95 reproduction**; not yet confirmed on GitHub CI (trigger mismatch below). After this session: `cargo test --workspace` = **350 pass / 0 fail**; `cargo fmt --all -- --check` + `cargo clippy --workspace --all-targets --all-features -- -D warnings` clean.
+- `nightly.yml`: gates **#15, #24** (Phase 2) + **#1, #5-RSS, #8, #28, #29** (Phase 1 measurable subset) wired + green locally.
+- Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md`; gate triage: `docs/phase1-exit-gates.md`.
 
 ### Next actionables (priority order)
 
-1. **`1.exit`** (`[next]`, autonomous) — build the nine exit-gate harnesses (§6.1 {1,4,5,6,7,8,17,28,29}; **not** "perf gates" — see `docs/phase1-exit-gates.md`) on the `TerminalSession` pipeline, wire into `nightly.yml`. Triage: 5 measurable headless now, 4 blocked on renderer/subsystem integration. Largest remaining Phase-1 item.
-2. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml` trigger to `master`, or rename branch), then open a PR / push so `ci.yml` actually runs on `windows-latest`. Local green ≠ CI green.
-3. **GUI visual verify** (human-only) — `cargo run -p bongterm-app`; confirm live shell renders glyphs + typing is visible. No headless session can check this; gates calling the vertical slice "done".
+1. **Integration session** (autonomous code + human visual) — wire the real subsystems into `bongterm-app` to unblock the remaining Phase-1 gates: real wgpu renderer (`bongterm-render::TerminalPipeline`) → #4/#5-VRAM/#6; `bongterm-mux` panes → #7; `bongterm-ledger` dashboard + `register_pid`/process-tree attribution → #17. Each needs a GPU/display + a human GUI check; **do not fake these green** (`docs/phase1-exit-gates.md`). Bounded headless-verifiable pre-work exists: build `CurrentProcessSampler::register_pid` + child attribution in `bongterm-ledger` (doc claims it; impl missing).
+2. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml`/`nightly.yml` triggers to `master`, or rename branch), then push/PR so CI runs on `windows-latest`. Local green ≠ CI green.
+3. **GUI visual verify** (human-only) — `cargo run -p bongterm-app`; confirm live shell renders glyphs + typing is visible. No headless session can check this.
 
 ### Key known issues / deferred items
 
@@ -132,8 +132,10 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 **Implementation outline:**
 
-- [next] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
-  - *Note (2026-05-31):* the CI **hygiene** precondition is cleared — `ci.yml` is fully green on stable 1.95. What remains for `1.exit` is building the nine exit-gate harnesses on the now-wired `TerminalSession` pipeline, then wiring them as steps in `nightly.yml`. **See `docs/phase1-exit-gates.md` for the full triage.** ⚠ The canonical gate criteria are §6.1 — the set {1,4,5,6,7,8,17,28,29} is **not** "perf gates"; earlier notes here mislabelled them off-by-one (e.g. #1 is *shell-profile launch*, **not** keystroke-to-glyph; #2/#3 are the renderer-perf gates and are deliberately **excluded** from Phase 1). Triage splits them: **measurable now** = #1 shell-smoke, #5-RSS, #8 blocks, #29 storage recovery, #28 settings safe-mode; **blocked on renderer/subsystem integration** = #4, #5-VRAM, #6, #7, #17 (do not fake green).
+- [block] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies *(blocked on the integration gates below + 7 nightly runs)*
+  - **Measurable subset DONE this session** (commits `b81eaf0`→`2e0947e`, green locally, wired into `nightly.yml`): **#1** shell-smoke (real ConPTY→parser→snapshot per profile; PASS CMD/WinPS/PS7/SSH, skip-log Git Bash/WSL), **#5-RSS** (real `CurrentProcessSampler`; core RSS 9.8 MB ≤120 MB), **#8** blocks (fixture corpus + p99 500 ns ≤5 ms), **#28** settings (backup+SafeMode+migration built), **#29** storage recovery (torn/checksum/corrupt-DB). See `docs/phase1-exit-gates.md`.
+  - **Remaining = blocked on renderer/subsystem integration** (do NOT fake green — all need the real subsystems wired into `bongterm-app` + a GPU/display + a human visual check): **#4** cold-start-to-first-frame, **#5-VRAM**, **#6** idle CPU (render loop), **#7** split panes (mux unwired), **#17** dashboard attribution (ledger unwired; also `CurrentProcessSampler::register_pid` is documented but unimplemented). This is the SHIP-READINESS "wire the real renderer + re-integrate subsystems" step — its own session.
+  - ⚠ Gate criteria are canonical in spec §6.1; the set {1,4,5,6,7,8,17,28,29} is **not** "perf gates" (#2/#3 are the renderer-perf gates, deliberately excluded from Phase 1). §6.1 **#2/#3/#27** are in no phase exit set — land #2/#3 when the renderer is wired, #27 at release review.
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
 ---

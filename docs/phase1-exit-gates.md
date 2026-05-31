@@ -7,6 +7,24 @@ this session, not trusted from docs.
 This document is the detailed breakdown of orca task **`1.exit`**. orca stays the
 task authority; this is the working state for the nine Phase-1 exit gates.
 
+> **STATUS (2026-05-31, commits `b81eaf0`→`2e0947e`):** the **measurable subset is
+> DONE** — built, verified with real numbers, wired into `nightly.yml`, committed.
+> Post-session: `cargo test --workspace` = 350 pass / 0 fail; fmt + clippy
+> (`--workspace -D warnings`) clean.
+>
+> | Gate | Result | CI step |
+> |---|---|---|
+> | #1 shell-smoke | PASS 4/6 (CMD, WinPS, PS7, SSH); skip-log Git Bash, WSL | `cargo test -p bongterm-app --test gate01_shell_smoke` |
+> | #5 RSS | core RSS **9.8 MB** ≤ 120 MB | `cargo test -p bongterm-app --test gate05_rss` |
+> | #8 blocks | fixture corpus green + detection p99 **500 ns** ≤ 5 ms | `cargo test -p bongterm-blocks` |
+> | #28 settings | backup + Safe Mode + v1→v2 migration built + tested | `cargo test -p bongterm-settings --test gate28_settings_recovery` |
+> | #29 storage | torn / checksum / corrupt-DB recovery | `cargo test -p bongterm-storage-sqlite --test gate29_storage_recovery_suite` |
+>
+> **Still BLOCKED** (integration + GPU/display + human visual — do not fake): #4,
+> #5-VRAM, #6, #7, #17. These are the next session's "wire renderer/mux/ledger into
+> the app" work. `1.exit` overall stays open until these land **and** the nightly is
+> green for 7 consecutive runs on real CI.
+
 ---
 
 ## Gate-number correction (IMPORTANT — orca labels were wrong)
