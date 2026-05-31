@@ -51,7 +51,7 @@
 
 ### Next actionables (priority order)
 
-1. **`1.exit`** (`[next]`, autonomous) — build Phase-1 perf-gate harnesses (#1,#4-8,#17,#28,#29) on the `TerminalSession` pipeline, wire into `nightly.yml`. Largest remaining Phase-1 item; unstarted.
+1. **`1.exit`** (`[next]`, autonomous) — build the nine exit-gate harnesses (§6.1 {1,4,5,6,7,8,17,28,29}; **not** "perf gates" — see `docs/phase1-exit-gates.md`) on the `TerminalSession` pipeline, wire into `nightly.yml`. Triage: 5 measurable headless now, 4 blocked on renderer/subsystem integration. Largest remaining Phase-1 item.
 2. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml` trigger to `master`, or rename branch), then open a PR / push so `ci.yml` actually runs on `windows-latest`. Local green ≠ CI green.
 3. **GUI visual verify** (human-only) — `cargo run -p bongterm-app`; confirm live shell renders glyphs + typing is visible. No headless session can check this; gates calling the vertical slice "done".
 
@@ -133,7 +133,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 **Implementation outline:**
 
 - [next] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
-  - *Note (2026-05-31):* the CI **hygiene** precondition is cleared — `ci.yml` is fully green on stable 1.95. What remains for `1.exit` is the **perf-gate harnesses** (keystroke-to-glyph p99 #1, throughput #4, RSS #5, VRAM #6, live dashboard #29, …) built on the now-wired `TerminalSession` pipeline, then wired as steps in `nightly.yml`. Unstarted.
+  - *Note (2026-05-31):* the CI **hygiene** precondition is cleared — `ci.yml` is fully green on stable 1.95. What remains for `1.exit` is building the nine exit-gate harnesses on the now-wired `TerminalSession` pipeline, then wiring them as steps in `nightly.yml`. **See `docs/phase1-exit-gates.md` for the full triage.** ⚠ The canonical gate criteria are §6.1 — the set {1,4,5,6,7,8,17,28,29} is **not** "perf gates"; earlier notes here mislabelled them off-by-one (e.g. #1 is *shell-profile launch*, **not** keystroke-to-glyph; #2/#3 are the renderer-perf gates and are deliberately **excluded** from Phase 1). Triage splits them: **measurable now** = #1 shell-smoke, #5-RSS, #8 blocks, #29 storage recovery, #28 settings safe-mode; **blocked on renderer/subsystem integration** = #4, #5-VRAM, #6, #7, #17 (do not fake green).
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
 ---
