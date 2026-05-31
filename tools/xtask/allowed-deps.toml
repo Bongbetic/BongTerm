@@ -60,7 +60,9 @@ allowed = ["bongterm-secrets-api", "bongterm-settings"]
 allowed = []
 
 [bongterm-storage-sqlite]
-allowed = ["bongterm-storage-api"]
+# dev-dep on test-kit runs the storage repo conformance suites against SqliteStore
+# (dev-only edge; mirrors the allowed [bongterm-agents] -> bongterm-test-kit pattern).
+allowed = ["bongterm-storage-api", "bongterm-test-kit"]
 
 [bongterm-settings]
 allowed = []

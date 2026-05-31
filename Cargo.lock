@@ -431,6 +431,7 @@ version = "0.0.0"
 dependencies = [
  "blake3",
  "bongterm-storage-api",
+ "bongterm-test-kit",
  "parking_lot",
  "rusqlite",
  "tempfile",
