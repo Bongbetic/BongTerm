@@ -4,6 +4,22 @@
 > Evidence-based ground-truth audit, not a status restatement. Where a claim is
 > inferred rather than directly verified, it is marked **[inferred]**.
 
+> **Update 3 (2026-05-31, later session — CI MADE GREEN):** `ci.yml` was red on
+> three gates at the start of this session and is now **fully green on all 7
+> steps** (stable 1.95). Landed on `master`: `ccef9ca` (restore the
+> storage-sqlite repo-conformance coverage that an uncommitted change had deleted
+> to dodge `check-deps`, fixed properly via a one-line allow-list entry +
+> re-lock), `9c98f06` (stable rustfmt + ~38 behavior-preserving clippy
+> `-D warnings` fixes across the workspace), `03b5678` (`cargo deny`: ignore the
+> `adler` *unmaintained* advisory + allow `WTFPL` — both transitive via vendored
+> wezterm), `41047c4` (stale-path + AGENTS.md doc fixes). Verified: fmt-check
+> clean, clippy exit 0, `cargo test --workspace` 343 pass/0 fail/1 ignored,
+> `cargo deny check` ok, `check-deps` ok, `cargo build --release --workspace`
+> ok, `terminal_session` slice test 1 pass. **Caveats unchanged below:** this
+> unblocks CI but does not make a usable product — the GUI *visual* render is
+> still unverified (human-only step), and `nightly.yml`'s Phase-1 perf gates
+> (#1,#4-8,#17,#28,#29 = task `1.exit`) are still unwired. See `handoff.md`.
+>
 > **Update 2 (2026-05-31, same session — VERTICAL SLICE LANDED):** The gating
 > "is it a working terminal" finding below is now **partially resolved**.
 > `cargo run -p bongterm-app` opens a window running a **real shell** (pwsh/cmd).

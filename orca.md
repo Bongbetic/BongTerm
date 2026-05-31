@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete (1.A.4b + 1.B.3 + 1.C.1-5 + 1.D.1-3 + 1.E.1-4 + 1.F.1-4 + 1.G.1-4); `[next]` = 1.exit (CI gate wiring) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete; **`ci.yml` now fully green** (fmt/clippy/deny/test/check-deps/release/submodule — commits `ccef9ca`→`41047c4`); `[next]` = 1.exit = wire the Phase-1 **perf** gates into `nightly.yml` (unstarted) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; `[next]` = `2.replan` | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
@@ -118,6 +118,7 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 **Implementation outline:**
 
 - [next] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies
+  - *Note (2026-05-31):* the CI **hygiene** precondition is cleared — `ci.yml` is fully green on stable 1.95. What remains for `1.exit` is the **perf-gate harnesses** (keystroke-to-glyph p99 #1, throughput #4, RSS #5, VRAM #6, live dashboard #29, …) built on the now-wired `TerminalSession` pipeline, then wired as steps in `nightly.yml`. Unstarted.
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
 ---
