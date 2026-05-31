@@ -4,7 +4,27 @@
 > Evidence-based ground-truth audit, not a status restatement. Where a claim is
 > inferred rather than directly verified, it is marked **[inferred]**.
 
-> **Update (2026-05-31, same session):** Phase 2 (agent observability) is now
+> **Update 2 (2026-05-31, same session — VERTICAL SLICE LANDED):** The gating
+> "is it a working terminal" finding below is now **partially resolved**.
+> `cargo run -p bongterm-app` opens a window running a **real shell** (pwsh/cmd).
+> - New `bongterm-app::session::TerminalSession` (iced-free, testable) spawns a
+>   real ConPTY via `PortablePtyHost`, feeds output through `WezTermAdapter`, and
+>   renders a `SurfaceSnapshot`. `WezTermAdapter::current_snapshot` — previously a
+>   stub returning empty runs (the real reason nothing could render) — now
+>   extracts grid text + cursor.
+> - A thin iced shell (`terminal_app.rs`) pumps ConPTY bytes (reader thread →
+>   mpsc → `time::every` tick → parser) and maps keystrokes → `write_input`.
+> - **Evidence:** headless integration test `tests/terminal_session.rs` proves
+>   spawn→write→read→parse→snapshot (asserts a `cmd.exe` `echo hello` lands in the
+>   grid) — GREEN; binary builds clean; a bounded launch ran 6s with no crash.
+> - **Honestly NOT verified (no display here):** that glyphs visually render and
+>   typing is visible in the GUI. The parse/snapshot path is asserted; the on-
+>   screen render path compiles + launches but isn't visually asserted — the user
+>   should run it. **Cuts (all deliberate v1):** pragmatic iced-`text` grid (not
+>   the wgpu `TerminalPipeline`), fixed 80×24 (no resize), no colour/attrs, the
+>   `bongterm-ui` shell (tabs/palette/sidebar) is bypassed pending integration.
+>
+> **Update 1 (2026-05-31, same session):** Phase 2 (agent observability) is now
 > **code-complete** — tasks 2.C.3a–2.C.3c, 2.D.1, 2.EXIT landed (commits
 > `31a9c0e`→`662e31b`). Both Phase 2 P0 gates are green locally and wired into a
 > new `nightly.yml`: **#24** (`cargo run -p xtask -- prompt-injection-corpus` →

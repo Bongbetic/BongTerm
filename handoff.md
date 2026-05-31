@@ -4,7 +4,7 @@
 
 - **Repo moved** `C:\Users\souba\Documents\Projects\BongT` → `D:\Programming\Bongbetic\BongT`. Many docs still cite the old path. A stale incremental build cached the old `CARGO_MANIFEST_DIR`, causing 5 phantom `bongterm-blocks` failures — fixed by rebuild. **Run `cargo clean` once** on a fresh clone if you see `os error 3` / path-not-found in fixture tests.
 - **Phase 2 (agent observability) is code-complete.** Tasks 2.C.3a → 2.EXIT landed this session. Both P0 gates (#15, #24) green locally + wired into `nightly.yml`.
-- **The app is still not a working terminal.** See `SHIP-READINESS.md` — `bongterm-app`/`-ui` don't depend on `-pty`/`-term`/`-render`; the window shows placeholder panels. The vertical slice is the real gating work for a usable product. (The user, shown this gap, chose to continue orca.md Phase 2 rather than pivot.)
+- **The vertical slice landed — the app now runs a real shell.** `cargo run -p bongterm-app` opens a window running pwsh/cmd. New `bongterm-app::session::TerminalSession` (ConPTY + parser) + a thin iced shell (`terminal_app.rs`); `WezTermAdapter::current_snapshot` was a stub (empty runs) and is now implemented. Proven headlessly (`tests/terminal_session.rs`) + a clean 6s launch. **Not visually verified** (no display in-session) — run it to confirm glyphs/typing. Renderer is pragmatic iced-`text` (not wgpu yet); 80×24 fixed; `bongterm-ui` shell bypassed. See `SHIP-READINESS.md` Update 2.
 
 ## This session's commits (on `master`)
 
@@ -41,11 +41,23 @@ The Phase 2 plan (`docs/superpowers/plans/2026-05-29-bongt-phase2.md`) drifted f
 - **Workspace clippy/fmt debt.** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` fail on pre-existing issues in other crates (`bongterm-settings` missing `# Panics`, `map_or`/match-arm/derivable-impl, etc.) and the nightly-only rustfmt config on the stable toolchain. Phase 2 code itself is clippy-clean. This blocks ci.yml's existing clippy/fmt gates — needs a hygiene pass (1.exit territory).
 - **Uncommitted pre-existing changes** still in the tree (not from this session): `crates/bongterm-storage-sqlite/{Cargo.toml,src/lib.rs}` removes the `bongterm-test-kit` dev-dep + 3 repo-conformance tests to satisfy `check-deps` — a **coverage regression**. Resolve properly (host the storage conformance harness in `bongterm-test-kit`, which already depends on the trait crates, and run it against `SqliteStore` there) or revert. Also `AGENTS.md`, `Cargo.lock` modified.
 
+## Vertical-slice commits (this session, after Phase 2)
+
+| Commit | What |
+|--------|------|
+| `54d17a0` | `TerminalSession` core + real `WezTermAdapter::current_snapshot`; headless proof |
+| `6a5cd26` | iced terminal shell (`terminal_app.rs`); `main.rs` repointed; app runs a real shell |
+
 ## Next actionable
 
-`2.replan` — invoke `superpowers:writing-plans` for Phase 3 (Developer UX; outline in `orca.md`). Per orca re-plan rule, also consult the AnythingLLM `engineer` workspace. **Do not implement Phase 3 from outline-level tasks alone.**
+Highest-value follow-ups on the slice (none are in orca.md yet):
+1. **Visually verify** `cargo run -p bongterm-app` — confirm glyphs render and typing works; fix render/input issues a headless test can't catch.
+2. **Resize** (re-create PTY + adapter on window resize; currently fixed 80×24).
+3. **Colour/attributes** — `current_snapshot` emits one run/row with default colours; extract per-cell fg/bg/attrs and have the renderer honour them.
+4. **Fold into the `bongterm-ui` shell** — host the terminal surface inside `BongTermShell` (tabs/palette/sidebar) instead of bypassing it. Needs a port so ui stays presentation-only (ui can't depend on pty/term).
+5. **wgpu renderer** — swap the pragmatic iced-`text` grid for `bongterm-render::TerminalPipeline` behind the `SurfaceSnapshot` boundary (perf gates #1/#4/#6).
 
-Alternatively (more honest "ship" work, per `SHIP-READINESS.md`): the **vertical slice** — wire `app → ui → {pty, term, render}` so `cargo run -p bongterm-app` shows a live shell. This is the gating work for a usable terminal and is not in orca.md.
+Or resume orca.md: `2.replan` — invoke `superpowers:writing-plans` for Phase 3 (consult AnythingLLM `engineer`; **do not implement from outline alone**).
 
 ## Key artifacts
 
