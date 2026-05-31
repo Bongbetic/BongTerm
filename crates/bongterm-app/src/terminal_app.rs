@@ -14,8 +14,8 @@ use bongterm_term::SurfaceSnapshot;
 use iced::event::{self, Event};
 use iced::keyboard::{self, Key, key::Named};
 use iced::time::{self, Duration};
-use iced::widget::{column, container, text};
-use iced::{Element, Font, Length, Subscription, Task, Theme};
+use iced::widget::container;
+use iced::{Element, Length, Subscription, Task, Theme};
 
 use crate::session::TerminalSession;
 
@@ -112,25 +112,21 @@ impl TerminalApp {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let lines = render_rows(&self.snapshot);
-        let rows: Vec<Element<'_, Message>> = lines
-            .into_iter()
-            .map(|line| {
-                text(if line.is_empty() {
-                    " ".to_string()
-                } else {
-                    line
-                })
-                .font(Font::MONOSPACE)
-                .size(14)
-                .into()
-            })
-            .collect();
-        container(column(rows).spacing(0))
-            .padding(8)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        // Render the grid through the real wgpu/cryoglyph renderer
+        // (`bongterm-render`) via Iced's shader widget, replacing the previous
+        // pragmatic iced-`text` grid.
+        let program = TerminalProgram {
+            snapshot: to_render_snapshot(&self.snapshot),
+        };
+        container(
+            iced::widget::shader::Shader::new(program)
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .padding(8)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 
     #[must_use]
@@ -158,25 +154,55 @@ fn which_on_path(program: &str) -> bool {
         .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
 }
 
-/// Lay the snapshot's runs into per-row strings (column-padded).
-fn render_rows(snap: &SurfaceSnapshot) -> Vec<String> {
-    let mut lines = vec![String::new(); snap.rows.max(1) as usize];
-    let mut runs: Vec<_> = snap.runs.iter().collect();
-    runs.sort_by_key(|r| (r.row, r.start_col));
-    for run in runs {
-        let row = run.row as usize;
-        if row >= lines.len() {
+/// An Iced shader program that draws the terminal grid via `bongterm-render`.
+struct TerminalProgram {
+    snapshot: bongterm_render::SurfaceSnapshot,
+}
+
+impl iced::widget::shader::Program<Message> for TerminalProgram {
+    type State = ();
+    type Primitive = bongterm_render::TerminalPrimitive;
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        _cursor: iced::mouse::Cursor,
+        _bounds: iced::Rectangle,
+    ) -> Self::Primitive {
+        // Full-surface redraw for now; dirty-region tracking is a later pass.
+        bongterm_render::TerminalPrimitive::new(self.snapshot.clone(), Vec::new())
+    }
+}
+
+/// Convert the terminal-core snapshot (text runs) into the renderer's
+/// row-major codepoint grid. Lossy for now (no colour/attributes) — enough to
+/// drive the real renderer. Multi-width glyphs advance one column (refined later).
+// u32->u16 grid dims are window-bounded; truncation cannot occur in practice.
+#[allow(clippy::cast_possible_truncation)]
+fn to_render_snapshot(term: &SurfaceSnapshot) -> bongterm_render::SurfaceSnapshot {
+    let w = term.cols as usize;
+    let h = term.rows as usize;
+    let mut cells = vec![0u32; w.saturating_mul(h)];
+    for run in &term.runs {
+        let r = run.row as usize;
+        if r >= h {
             continue;
         }
-        let line = &mut lines[row];
-        let start = run.start_col as usize;
-        let cur = line.chars().count();
-        if cur < start {
-            line.push_str(&" ".repeat(start - cur));
+        let base = run.start_col as usize;
+        for (i, ch) in run.text.chars().enumerate() {
+            let c = base + i;
+            if c >= w {
+                break;
+            }
+            cells[r * w + c] = ch as u32;
         }
-        line.push_str(&run.text);
     }
-    lines
+    bongterm_render::SurfaceSnapshot {
+        id: bongterm_render::SnapshotId(0),
+        cols: term.cols as u16,
+        rows: term.rows as u16,
+        cells,
+    }
 }
 
 /// Map a key press to the bytes a terminal would send to the shell.

@@ -264,8 +264,10 @@ impl TerminalPrimitive {
 /// Phase 1.C.3 will wire `prepare`/`draw` to actually render glyphs.
 pub struct TerminalPipeline {
     atlas: cryoglyph::TextAtlas,
-    #[allow(dead_code)] // Phase 1.C.3 wires prepare()/draw()
     renderer: cryoglyph::TextRenderer,
+    font_system: cryoglyph::FontSystem,
+    swash_cache: cryoglyph::SwashCache,
+    viewport: cryoglyph::Viewport,
 }
 
 impl iced::widget::shader::Pipeline for TerminalPipeline {
@@ -282,7 +284,14 @@ impl iced::widget::shader::Pipeline for TerminalPipeline {
             iced::wgpu::MultisampleState::default(),
             None, // no depth stencil for terminal rendering
         );
-        Self { atlas, renderer }
+        let viewport = cryoglyph::Viewport::new(device, &cache);
+        Self {
+            atlas,
+            renderer,
+            font_system: cryoglyph::FontSystem::new(),
+            swash_cache: cryoglyph::SwashCache::new(),
+            viewport,
+        }
     }
 
     fn trim(&mut self) {
@@ -290,26 +299,137 @@ impl iced::widget::shader::Pipeline for TerminalPipeline {
     }
 }
 
+/// Lay the snapshot's row-major codepoints out as one `\n`-joined string.
+///
+/// Cell `0` and control codepoints render as a space; trailing spaces per row
+/// are trimmed so the shaper does not pad runs. This is the scaffold's lossy
+/// text view (no colour/attributes yet) — enough to put glyphs on screen.
+#[must_use]
+fn snapshot_to_text(snap: &SurfaceSnapshot) -> String {
+    let cols = snap.cols as usize;
+    let rows = snap.rows as usize;
+    let mut out = String::with_capacity((cols + 1) * rows);
+    for r in 0..rows {
+        let mut line = String::with_capacity(cols);
+        for c in 0..cols {
+            let cp = snap.cells.get(r * cols + c).copied().unwrap_or(0);
+            let ch = char::from_u32(cp).filter(|c| !c.is_control());
+            line.push(ch.unwrap_or(' '));
+        }
+        out.push_str(line.trim_end());
+        if r + 1 < rows {
+            out.push('\n');
+        }
+    }
+    out
+}
+
 impl iced::widget::shader::Primitive for TerminalPrimitive {
     type Pipeline = TerminalPipeline;
 
+    // Casts to/from f32/i32 are intrinsic to pixel-space layout math here; the
+    // values (window-bounded pixel coords) are far inside the lossy ranges.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_wrap
+    )]
     fn prepare(
         &self,
-        _pipeline: &mut Self::Pipeline,
-        _device: &iced::wgpu::Device,
-        _queue: &iced::wgpu::Queue,
-        _bounds: &iced::Rectangle,
-        _viewport: &iced::widget::shader::Viewport,
+        pipeline: &mut Self::Pipeline,
+        device: &iced::wgpu::Device,
+        queue: &iced::wgpu::Queue,
+        bounds: &iced::Rectangle,
+        viewport: &iced::widget::shader::Viewport,
     ) {
-        // Phase 1.C.3: upload dirty cells via pipeline.renderer.prepare()
+        let text = snapshot_to_text(&self.snapshot);
+
+        // The shader render pass covers the whole physical surface; positions and
+        // the cryoglyph viewport are in physical pixels, so scale logical bounds.
+        let scale = viewport.scale_factor();
+        let physical = viewport.physical_size();
+        pipeline.viewport.update(
+            queue,
+            cryoglyph::Resolution {
+                width: physical.width,
+                height: physical.height,
+            },
+        );
+
+        // Logical-pixel metrics; the TextArea scale lifts them to physical px.
+        let font_size = 14.0_f32;
+        let line_height = font_size * 1.25;
+        let mut buffer = cryoglyph::Buffer::new(
+            &mut pipeline.font_system,
+            cryoglyph::Metrics::new(font_size, line_height),
+        );
+        buffer.set_wrap(&mut pipeline.font_system, cryoglyph::Wrap::None);
+        buffer.set_size(
+            &mut pipeline.font_system,
+            Some(bounds.width.max(1.0)),
+            Some(bounds.height.max(1.0)),
+        );
+        let attrs = cryoglyph::Attrs::new().family(cryoglyph::Family::Monospace);
+        buffer.set_text(
+            &mut pipeline.font_system,
+            &text,
+            &attrs,
+            cryoglyph::Shaping::Advanced,
+            None,
+        );
+        buffer.shape_until_scroll(&mut pipeline.font_system, false);
+
+        let left = bounds.x * scale;
+        let top = bounds.y * scale;
+        let area = cryoglyph::TextArea {
+            buffer: &buffer,
+            left,
+            top,
+            scale,
+            bounds: cryoglyph::TextBounds {
+                left: left as i32,
+                top: top as i32,
+                right: ((bounds.x + bounds.width) * scale) as i32,
+                bottom: ((bounds.y + bounds.height) * scale) as i32,
+            },
+            default_color: cryoglyph::Color::rgb(0xCC, 0xCC, 0xCC),
+        };
+
+        // cryoglyph's prepare records its staging-belt copies into an encoder; the
+        // Iced shader API gives us no encoder, so create one and submit it here so
+        // the glyph vertices are uploaded before draw().
+        let mut encoder = device.create_command_encoder(&iced::wgpu::CommandEncoderDescriptor {
+            label: Some("bongterm-text-prepare"),
+        });
+        if let Err(e) = pipeline.renderer.prepare(
+            device,
+            queue,
+            &mut encoder,
+            &mut pipeline.font_system,
+            &mut pipeline.atlas,
+            &pipeline.viewport,
+            [area],
+            &mut pipeline.swash_cache,
+        ) {
+            // Atlas-full or shaping error: skip this frame's text rather than
+            // panic; the renderer recovers on the next frame.
+            eprintln!("bongterm-render: text prepare failed: {e:?}");
+        }
+        queue.submit(Some(encoder.finish()));
     }
 
     fn draw(
         &self,
-        _pipeline: &Self::Pipeline,
-        _render_pass: &mut iced::wgpu::RenderPass<'_>,
+        pipeline: &Self::Pipeline,
+        render_pass: &mut iced::wgpu::RenderPass<'_>,
     ) -> bool {
-        // Phase 1.C.3: pipeline.renderer.render(render_pass, &pipeline.atlas, ...)
+        if let Err(e) = pipeline
+            .renderer
+            .render(&pipeline.atlas, &pipeline.viewport, render_pass)
+        {
+            eprintln!("bongterm-render: text render failed: {e:?}");
+        }
         true
     }
 }

@@ -11,6 +11,7 @@ bongterm-diagnostics = { path = "../bongterm-diagnostics" }
 bongterm-ui = { path = "../bongterm-ui" }
 bongterm-pty = { path = "../bongterm-pty" }
 bongterm-term = { path = "../bongterm-term" }
+bongterm-render = { path = "../bongterm-render" }
 anyhow = { workspace = true }
 iced = { workspace = true }
 

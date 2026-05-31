@@ -311,6 +311,7 @@ dependencies = [
  "bongterm-diagnostics",
  "bongterm-ledger",
  "bongterm-pty",
+ "bongterm-render",
  "bongterm-term",
  "bongterm-ui",
  "iced",
