@@ -35,15 +35,30 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete; **`ci.yml` now fully green** (fmt/clippy/deny/test/check-deps/release/submodule — commits `ccef9ca`→`41047c4`); `[next]` = 1.exit = wire the Phase-1 **perf** gates into `nightly.yml` (unstarted) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete; **`ci.yml` green _locally_ on stable 1.95** (fmt/clippy/deny/test/check-deps/release/submodule), but **CI itself has not run** — `ci.yml` triggers on `push:[main]`+PRs and the branch is `master`; `.gitattributes eol=lf` added to survive Windows CI checkout. Commits `ccef9ca`→`31f44ae`. `[next]` = 1.exit = wire the Phase-1 **perf** gates into `nightly.yml` (unstarted) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; `[next]` = `2.replan` | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
+### Current status (2026-05-31, HEAD `31f44ae`, tree clean)
+
+- Working tree clean; one worktree (main); submodule `vendor/wezterm` clean at `5046fc22`; no stash.
+- `ci.yml` passes all 7 steps **in a local stable-1.95 reproduction**; not yet confirmed on GitHub CI (see trigger mismatch below).
+- `nightly.yml`: gates **#15 + #24 wired and green**; Phase-1 perf gates **not wired** (= `1.exit`, `[next]`).
+- Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md` (Update 3).
+
+### Next actionables (priority order)
+
+1. **`1.exit`** (`[next]`, autonomous) — build Phase-1 perf-gate harnesses (#1,#4-8,#17,#28,#29) on the `TerminalSession` pipeline, wire into `nightly.yml`. Largest remaining Phase-1 item; unstarted.
+2. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml` trigger to `master`, or rename branch), then open a PR / push so `ci.yml` actually runs on `windows-latest`. Local green ≠ CI green.
+3. **GUI visual verify** (human-only) — `cargo run -p bongterm-app`; confirm live shell renders glyphs + typing is visible. No headless session can check this; gates calling the vertical slice "done".
+
 ### Key known issues / deferred items
 
+- **`ci.yml` trigger mismatch** — triggers on `push:[main]`+PRs but the working branch is `master`, so CI has never executed. Decide: retarget the trigger or rename the branch. Until then "green" means *local repro only*.
+- **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
 - **CJK IME round-trip** — harness written (`cargo run -p s3b-ime-composition`); live test deferred to Phase 5 gate §6.1 #21
