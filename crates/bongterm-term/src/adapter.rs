@@ -6,7 +6,7 @@
 //! Phase 1 task 1.B.3: real `wezterm-term` wiring — `advance_bytes` delegates to
 //! `wezterm_term::Terminal::advance_bytes` per ADR-007.
 
-use crate::surface::{CellPosition, CursorState, CursorStyle, DirtyRegion, SurfaceSnapshot};
+use crate::surface::{CellPosition, CellRun, CursorState, CursorStyle, DirtyRegion, SurfaceSnapshot};
 use std::sync::Arc;
 
 /// Minimal `TerminalConfiguration` implementation: uses wezterm-term defaults for
@@ -72,12 +72,39 @@ impl WezTermAdapter {
 
     pub fn current_snapshot(&mut self) -> SurfaceSnapshot {
         self.seq += 1;
+
+        // v1: one run per non-blank visible row, default colors/attrs. Colour and
+        // per-cell attribute extraction is deferred (the renderer ignores them
+        // for now). A fresh terminal has no scrollback, so phys rows 0..rows map
+        // to the visible screen.
+        let rows = self.rows as usize;
+        let lines = self.terminal.screen().lines_in_phys_range(0..rows);
+        let mut runs = Vec::new();
+        for (row, line) in lines.iter().enumerate() {
+            let text = line.as_str();
+            let trimmed = text.trim_end();
+            if !trimmed.is_empty() {
+                runs.push(CellRun {
+                    row: u32::try_from(row).unwrap_or(u32::MAX),
+                    start_col: 0,
+                    text: trimmed.to_string(),
+                    fg: 0x00FF_FFFF,
+                    bg: 0,
+                    attrs: 0,
+                });
+            }
+        }
+
+        let cursor = self.terminal.cursor_pos();
         SurfaceSnapshot {
             cols: self.cols,
             rows: self.rows,
-            runs: vec![],
+            runs,
             cursor: CursorState {
-                position: CellPosition { row: 0, col: 0 },
+                position: CellPosition {
+                    row: u32::try_from(cursor.y).unwrap_or(0),
+                    col: u32::try_from(cursor.x).unwrap_or(0),
+                },
                 visible: true,
                 style: CursorStyle::Block,
             },
@@ -131,6 +158,18 @@ mod tests {
         let mut a = WezTermAdapter::new(80, 24);
         a.ingest_bytes(b"");
         assert!(a.take_dirty().is_empty());
+    }
+
+    #[test]
+    fn current_snapshot_contains_ingested_text() {
+        let mut a = WezTermAdapter::new(80, 24);
+        a.ingest_bytes(b"hello world");
+        let snap = a.current_snapshot();
+        let joined: String = snap.runs.iter().map(|r| r.text.clone()).collect();
+        assert!(
+            joined.contains("hello world"),
+            "snapshot runs must contain ingested text, got: {joined:?}"
+        );
     }
 
     /// Feed plain ASCII bytes; verify the terminal model reflects the text on row 0.

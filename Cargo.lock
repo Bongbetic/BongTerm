@@ -307,7 +307,10 @@ dependencies = [
 name = "bongterm-app"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "bongterm-diagnostics",
+ "bongterm-pty",
+ "bongterm-term",
  "bongterm-ui",
 ]
 
@@ -427,7 +430,6 @@ version = "0.0.0"
 dependencies = [
  "blake3",
  "bongterm-storage-api",
- "bongterm-test-kit",
  "parking_lot",
  "rusqlite",
  "tempfile",

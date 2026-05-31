@@ -9,3 +9,6 @@ publish = false
 [dependencies]
 bongterm-diagnostics = { path = "../bongterm-diagnostics" }
 bongterm-ui = { path = "../bongterm-ui" }
+bongterm-pty = { path = "../bongterm-pty" }
+bongterm-term = { path = "../bongterm-term" }
+anyhow = { workspace = true }
