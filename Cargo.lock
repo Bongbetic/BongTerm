@@ -309,6 +309,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bongterm-diagnostics",
+ "bongterm-ledger",
  "bongterm-pty",
  "bongterm-term",
  "bongterm-ui",

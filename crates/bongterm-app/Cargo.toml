@@ -13,3 +13,7 @@ bongterm-pty = { path = "../bongterm-pty" }
 bongterm-term = { path = "../bongterm-term" }
 anyhow = { workspace = true }
 iced = { workspace = true }
+
+[dev-dependencies]
+# Gate #5 (RSS): exercise the real resource sampler against a live session.
+bongterm-ledger = { path = "../bongterm-ledger" }
