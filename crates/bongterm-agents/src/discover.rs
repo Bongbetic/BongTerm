@@ -117,7 +117,10 @@ mod tests {
 
     #[test]
     fn version_parser_extracts_semver_token() {
-        assert_eq!(parse_version_line("claude 1.2.3"), Some("1.2.3".to_string()));
+        assert_eq!(
+            parse_version_line("claude 1.2.3"),
+            Some("1.2.3".to_string())
+        );
         assert_eq!(
             parse_version_line("codex-cli v0.9.0 (build 7)"),
             Some("0.9.0".to_string())

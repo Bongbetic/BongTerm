@@ -65,7 +65,10 @@ mod tests {
 
     impl TranscriptRepo for VecRepo {
         fn append_chunk(&self, row: &TranscriptRow) -> Result<(), StorageError> {
-            self.rows.lock().expect("rows mutex poisoned").push(row.clone());
+            self.rows
+                .lock()
+                .expect("rows mutex poisoned")
+                .push(row.clone());
             Ok(())
         }
 
@@ -112,6 +115,9 @@ mod tests {
         let mut sink = TranscriptSink::new(AgentRunId(Uuid::nil()));
         assert!(!sink.is_paused());
         sink.write(&FailRepo, "x");
-        assert!(sink.is_paused(), "sink must mark paused on persistence failure");
+        assert!(
+            sink.is_paused(),
+            "sink must mark paused on persistence failure"
+        );
     }
 }

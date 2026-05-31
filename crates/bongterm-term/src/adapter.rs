@@ -6,7 +6,9 @@
 //! Phase 1 task 1.B.3: real `wezterm-term` wiring — `advance_bytes` delegates to
 //! `wezterm_term::Terminal::advance_bytes` per ADR-007.
 
-use crate::surface::{CellPosition, CellRun, CursorState, CursorStyle, DirtyRegion, SurfaceSnapshot};
+use crate::surface::{
+    CellPosition, CellRun, CursorState, CursorStyle, DirtyRegion, SurfaceSnapshot,
+};
 use std::sync::Arc;
 
 /// Minimal `TerminalConfiguration` implementation: uses wezterm-term defaults for
@@ -46,7 +48,13 @@ impl WezTermAdapter {
             env!("CARGO_PKG_VERSION"),
             Box::new(std::io::sink()),
         );
-        Self { cols, rows, seq: 0, dirty: vec![], terminal }
+        Self {
+            cols,
+            rows,
+            seq: 0,
+            dirty: vec![],
+            terminal,
+        }
     }
 
     pub fn ingest_bytes(&mut self, bytes: &[u8]) {
@@ -148,9 +156,16 @@ mod tests {
         a.ingest_bytes(b"first");
         a.ingest_bytes(b"second");
         let first_take = a.take_dirty();
-        assert_eq!(first_take.len(), 2, "both ingest calls should produce dirty regions");
+        assert_eq!(
+            first_take.len(),
+            2,
+            "both ingest calls should produce dirty regions"
+        );
         let second_take = a.take_dirty();
-        assert!(second_take.is_empty(), "take_dirty should drain the accumulator");
+        assert!(
+            second_take.is_empty(),
+            "take_dirty should drain the accumulator"
+        );
     }
 
     #[test]
@@ -186,8 +201,7 @@ mod tests {
         let row0 = lines[0].as_str();
         assert!(
             row0.starts_with("hello"),
-            "expected row 0 to start with 'hello', got {:?}",
-            row0,
+            "expected row 0 to start with 'hello', got {row0:?}",
         );
     }
 }

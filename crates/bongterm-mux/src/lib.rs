@@ -176,8 +176,7 @@ impl FileLayoutRepo {
 
 impl LayoutRepo for FileLayoutRepo {
     fn save(&self, snapshot: &LayoutSnapshot) -> Result<(), LayoutRepoError> {
-        let json =
-            serde_json::to_string_pretty(snapshot).expect("LayoutSnapshot must serialize");
+        let json = serde_json::to_string_pretty(snapshot).expect("LayoutSnapshot must serialize");
         let tmp = self.path.with_extension("tmp");
         std::fs::write(&tmp, json.as_bytes()).map_err(|source| LayoutRepoError::Io {
             path: tmp.clone(),
@@ -194,14 +193,12 @@ impl LayoutRepo for FileLayoutRepo {
         if !self.path.exists() {
             return Ok(None);
         }
-        let json =
-            std::fs::read_to_string(&self.path).map_err(|source| LayoutRepoError::Io {
-                path: self.path.clone(),
-                source,
-            })?;
-        let snapshot = serde_json::from_str(&json).map_err(|source| LayoutRepoError::Parse {
+        let json = std::fs::read_to_string(&self.path).map_err(|source| LayoutRepoError::Io {
+            path: self.path.clone(),
             source,
         })?;
+        let snapshot =
+            serde_json::from_str(&json).map_err(|source| LayoutRepoError::Parse { source })?;
         Ok(Some(snapshot))
     }
 }
@@ -655,8 +652,7 @@ impl MuxRouter for InMemoryMux {
 
         for tab_snap in &snapshot.tabs {
             let tab_id = s.alloc_tab_id();
-            let mut pane_ids_for_tab: Vec<PaneId> =
-                Vec::with_capacity(tab_snap.panes.len());
+            let mut pane_ids_for_tab: Vec<PaneId> = Vec::with_capacity(tab_snap.panes.len());
 
             for pane_snap in &tab_snap.panes {
                 let pane_id = s.alloc_pane_id();
@@ -675,8 +671,7 @@ impl MuxRouter for InMemoryMux {
                 // Empty tab: no valid pane. Use id 0 as sentinel (never allocated).
                 PaneId(0)
             } else {
-                let idx =
-                    tab_snap.active_pane_index.min(pane_ids_for_tab.len() - 1);
+                let idx = tab_snap.active_pane_index.min(pane_ids_for_tab.len() - 1);
                 pane_ids_for_tab[idx]
             };
 

@@ -8,11 +8,11 @@
 //! monospace text grid; the wgpu `TerminalPipeline` can swap in behind the same
 //! `SurfaceSnapshot` boundary later.
 
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{Receiver, channel};
 
 use bongterm_term::SurfaceSnapshot;
 use iced::event::{self, Event};
-use iced::keyboard::{self, key::Named, Key};
+use iced::keyboard::{self, Key, key::Named};
 use iced::time::{self, Duration};
 use iced::widget::{column, container, text};
 use iced::{Element, Font, Length, Subscription, Task, Theme};
@@ -38,7 +38,8 @@ pub enum Message {
 }
 
 impl TerminalApp {
-    #[must_use]
+    // No explicit #[must_use]: the returned Task is already #[must_use], so the
+    // tuple carries that obligation without a redundant (message-less) attribute.
     pub fn boot() -> (Self, Task<Message>) {
         let shell = default_shell();
         let (mut session, reader) = TerminalSession::spawn_command(&shell, &[], COLS, ROWS)
@@ -115,10 +116,14 @@ impl TerminalApp {
         let rows: Vec<Element<'_, Message>> = lines
             .into_iter()
             .map(|line| {
-                text(if line.is_empty() { " ".to_string() } else { line })
-                    .font(Font::MONOSPACE)
-                    .size(14)
-                    .into()
+                text(if line.is_empty() {
+                    " ".to_string()
+                } else {
+                    line
+                })
+                .font(Font::MONOSPACE)
+                .size(14)
+                .into()
             })
             .collect();
         container(column(rows).spacing(0))
@@ -149,9 +154,8 @@ fn default_shell() -> String {
 }
 
 fn which_on_path(program: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|paths| {
-        std::env::split_paths(&paths).any(|dir| dir.join(program).is_file())
-    })
+    std::env::var_os("PATH")
+        .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
 }
 
 /// Lay the snapshot's runs into per-row strings (column-padded).
@@ -176,6 +180,10 @@ fn render_rows(snap: &SurfaceSnapshot) -> Vec<String> {
 }
 
 /// Map a key press to the bytes a terminal would send to the shell.
+// Nested guards kept un-collapsed: the staged `Key::Character` -> first-char ->
+// is-ascii checks read as a clear decision ladder; merging into let-chains would
+// not change behavior but would obscure the per-step intent.
+#[allow(clippy::collapsible_if)]
 fn key_to_bytes(key: &Key, text: Option<&str>, modifiers: keyboard::Modifiers) -> Option<Vec<u8>> {
     if let Key::Named(named) = key {
         match named {

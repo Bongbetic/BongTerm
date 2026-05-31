@@ -152,7 +152,7 @@ impl FramePacer {
     }
 
     /// Submits dirty regions for a snapshot.
-    /// If a frame is already pending, regions are merged and snapshot_id advances.
+    /// If a frame is already pending, regions are merged and `snapshot_id` advances.
     pub fn submit(&mut self, snapshot_id: SnapshotId, regions: &[DirtyRegion]) {
         match &mut self.pending {
             None => {
@@ -216,6 +216,10 @@ pub fn cell_quad_ndc(col: u16, row: u16, cols: u16, rows: u16) -> CellNdc {
 }
 
 /// Number of quads a dirty region produces (one per cell).
+// Takes `&DirtyRegion` so it composes directly with iterator adapters such as
+// `regions.iter().map(dirty_region_quad_count)`; passing by value would break
+// that call shape for a trivially-copyable 8-byte struct.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 #[must_use]
 pub fn dirty_region_quad_count(region: &DirtyRegion) -> u32 {
     u32::from(region.width) * u32::from(region.height)
@@ -255,7 +259,7 @@ impl TerminalPrimitive {
 /// GPU-side state: shared cryoglyph atlas + renderer (ADR-004 + ADR-005).
 ///
 /// Created once by Iced on first [`TerminalPrimitive`] encounter (ADR-005 §1).
-/// On DXGI DEVICE_REMOVED, Iced calls [`Storage::clear`] and invokes `new` again
+/// On DXGI `DEVICE_REMOVED`, Iced calls [`Storage::clear`] and invokes `new` again
 /// with a fresh device — this IS the device-loss recovery path (1.C.4).
 /// Phase 1.C.3 will wire `prepare`/`draw` to actually render glyphs.
 pub struct TerminalPipeline {
@@ -359,7 +363,7 @@ impl MockRendererBackend {
         self.state.lock().unwrap().frames_rendered
     }
 
-    /// Simulates a DXGI DEVICE_REMOVED event for testing device-loss recovery.
+    /// Simulates a DXGI `DEVICE_REMOVED` event for testing device-loss recovery.
     ///
     /// # Panics
     ///
@@ -496,12 +500,18 @@ mod tests {
 
     // --- 1.C.1: cell NDC + TerminalPrimitive ---
 
+    // Exact comparison is the point of this test: cell_quad_ndc is constructed so
+    // the last cell's edge lands on exactly ±1.0 with no floating-point drift.
+    #[allow(clippy::float_cmp)]
     #[test]
     fn last_cell_in_grid_reaches_ndc_corner() {
         let cell = cell_quad_ndc(79, 23, 80, 24);
         assert_eq!(cell.bottom_right, [1.0_f32, -1.0_f32]);
     }
 
+    // Exact comparison is intended: adjacent cells must share a bit-identical
+    // edge coordinate (n*2/cols) so quads tile with no seam.
+    #[allow(clippy::float_cmp)]
     #[test]
     fn adjacent_cells_share_exact_horizontal_edge() {
         let left = cell_quad_ndc(0, 0, 80, 24);
@@ -512,8 +522,18 @@ mod tests {
     #[test]
     fn quad_count_matches_sum_of_dirty_regions() {
         let regions = [
-            DirtyRegion { col: 0, row: 0, width: 3, height: 4 },
-            DirtyRegion { col: 10, row: 5, width: 2, height: 2 },
+            DirtyRegion {
+                col: 0,
+                row: 0,
+                width: 3,
+                height: 4,
+            },
+            DirtyRegion {
+                col: 10,
+                row: 5,
+                width: 2,
+                height: 2,
+            },
         ];
         let total: u32 = regions.iter().map(dirty_region_quad_count).sum();
         assert_eq!(total, 16);
@@ -537,6 +557,9 @@ mod tests {
         assert!(atlas_vram_warn_exceeded(ATLAS_VRAM_WARN_BYTES + 1));
     }
 
+    // Intentional constant assertion: documents and guards the ADR-004 invariant
+    // that the warn threshold stays strictly below the drop-and-recreate ceiling.
+    #[allow(clippy::assertions_on_constants)]
     #[test]
     fn warn_threshold_is_below_ceiling() {
         assert!(ATLAS_VRAM_WARN_BYTES < ATLAS_VRAM_CEILING_BYTES);
@@ -553,7 +576,9 @@ mod tests {
     fn mock_vram_usage_triggers_warn_predicate() {
         let mock = MockRendererBackend::new();
         mock.set_mock_vram_used(ATLAS_VRAM_WARN_BYTES);
-        assert!(atlas_vram_warn_exceeded(mock.collect_metrics().vram_used_bytes));
+        assert!(atlas_vram_warn_exceeded(
+            mock.collect_metrics().vram_used_bytes
+        ));
     }
 
     #[test]
@@ -569,7 +594,12 @@ mod tests {
     fn mock_returns_device_lost_after_forced_loss() {
         let mock = MockRendererBackend::new();
         mock.force_device_loss();
-        let snapshot = SurfaceSnapshot { id: SnapshotId(1), cols: 80, rows: 24, cells: vec![] };
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(1),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
         let err = mock.render_frame(&snapshot, &[]).unwrap_err();
         assert!(matches!(err, RenderError::DeviceLost));
     }
@@ -577,7 +607,12 @@ mod tests {
     #[test]
     fn device_lost_does_not_increment_frame_count() {
         let mock = MockRendererBackend::new();
-        let snapshot = SurfaceSnapshot { id: SnapshotId(1), cols: 80, rows: 24, cells: vec![] };
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(1),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
         mock.render_frame(&snapshot, &[]).unwrap();
         mock.force_device_loss();
         let _ = mock.render_frame(&snapshot, &[]);
@@ -588,7 +623,11 @@ mod tests {
     fn upload_glyphs_fails_after_device_loss() {
         let mock = MockRendererBackend::new();
         mock.force_device_loss();
-        let font = FontKey { family: "Mono".into(), weight: 400, italic: false };
+        let font = FontKey {
+            family: "Mono".into(),
+            weight: 400,
+            italic: false,
+        };
         let err = mock.upload_glyphs(&font, &[]).unwrap_err();
         assert!(matches!(err, RenderError::DeviceLost));
     }
@@ -596,7 +635,12 @@ mod tests {
     #[test]
     fn frame_pacer_state_survives_device_loss() {
         let mut pacer = FramePacer::new();
-        let region = DirtyRegion { col: 0, row: 0, width: 80, height: 24 };
+        let region = DirtyRegion {
+            col: 0,
+            row: 0,
+            width: 80,
+            height: 24,
+        };
         pacer.submit(SnapshotId(5), &[region]);
 
         let mock = MockRendererBackend::new();
@@ -604,7 +648,12 @@ mod tests {
 
         // recovery: new backend instance
         let fresh = MockRendererBackend::new();
-        let snapshot = SurfaceSnapshot { id: SnapshotId(5), cols: 80, rows: 24, cells: vec![] };
+        let snapshot = SurfaceSnapshot {
+            id: SnapshotId(5),
+            cols: 80,
+            rows: 24,
+            cells: vec![],
+        };
         let (_, regions) = pacer.take().unwrap();
         fresh.render_frame(&snapshot, &regions).unwrap();
         assert_eq!(fresh.frames_rendered(), 1);
@@ -621,14 +670,27 @@ mod tests {
     #[test]
     fn submit_marks_pacer_pending() {
         let mut pacer = FramePacer::new();
-        pacer.submit(SnapshotId(1), &[DirtyRegion { col: 0, row: 0, width: 10, height: 5 }]);
+        pacer.submit(
+            SnapshotId(1),
+            &[DirtyRegion {
+                col: 0,
+                row: 0,
+                width: 10,
+                height: 5,
+            }],
+        );
         assert!(!pacer.is_idle());
     }
 
     #[test]
     fn take_returns_submitted_regions_and_clears_pending() {
         let mut pacer = FramePacer::new();
-        let region = DirtyRegion { col: 0, row: 0, width: 10, height: 5 };
+        let region = DirtyRegion {
+            col: 0,
+            row: 0,
+            width: 10,
+            height: 5,
+        };
         pacer.submit(SnapshotId(3), &[region]);
         let (id, regions) = pacer.take().unwrap();
         assert_eq!(id, SnapshotId(3));
@@ -646,8 +708,18 @@ mod tests {
     #[test]
     fn coalesce_preserves_all_regions_from_missed_frames() {
         let mut pacer = FramePacer::new();
-        let r1 = DirtyRegion { col: 0, row: 0, width: 10, height: 1 };
-        let r2 = DirtyRegion { col: 0, row: 5, width: 10, height: 2 };
+        let r1 = DirtyRegion {
+            col: 0,
+            row: 0,
+            width: 10,
+            height: 1,
+        };
+        let r2 = DirtyRegion {
+            col: 0,
+            row: 5,
+            width: 10,
+            height: 2,
+        };
         pacer.submit(SnapshotId(1), &[r1]);
         pacer.submit(SnapshotId(2), &[r2]);
         let (_, regions) = pacer.take().unwrap();
@@ -659,8 +731,24 @@ mod tests {
     #[test]
     fn latest_snapshot_id_wins_after_coalescing() {
         let mut pacer = FramePacer::new();
-        pacer.submit(SnapshotId(1), &[DirtyRegion { col: 0, row: 0, width: 1, height: 1 }]);
-        pacer.submit(SnapshotId(99), &[DirtyRegion { col: 1, row: 0, width: 1, height: 1 }]);
+        pacer.submit(
+            SnapshotId(1),
+            &[DirtyRegion {
+                col: 0,
+                row: 0,
+                width: 1,
+                height: 1,
+            }],
+        );
+        pacer.submit(
+            SnapshotId(99),
+            &[DirtyRegion {
+                col: 1,
+                row: 0,
+                width: 1,
+                height: 1,
+            }],
+        );
         let (id, _) = pacer.take().unwrap();
         assert_eq!(id, SnapshotId(99));
     }
@@ -669,7 +757,15 @@ mod tests {
     fn n_submits_produce_single_pending_slot() {
         let mut pacer = FramePacer::new();
         for i in 0..5 {
-            pacer.submit(SnapshotId(i), &[DirtyRegion { col: 0, row: 0, width: 1, height: 1 }]);
+            pacer.submit(
+                SnapshotId(i),
+                &[DirtyRegion {
+                    col: 0,
+                    row: 0,
+                    width: 1,
+                    height: 1,
+                }],
+            );
         }
         assert!(pacer.take().is_some());
         assert!(pacer.is_idle());
@@ -684,7 +780,12 @@ mod tests {
             rows: 24,
             cells: vec![],
         };
-        let dirty = vec![DirtyRegion { col: 0, row: 0, width: 80, height: 24 }];
+        let dirty = vec![DirtyRegion {
+            col: 0,
+            row: 0,
+            width: 80,
+            height: 24,
+        }];
         let prim = TerminalPrimitive::new(snapshot, dirty);
         assert_eq!(prim.snapshot().id, SnapshotId(7));
         assert_eq!(prim.dirty().len(), 1);

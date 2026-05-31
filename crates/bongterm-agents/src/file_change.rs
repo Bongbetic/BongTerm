@@ -56,7 +56,11 @@ pub fn parse_porcelain_v1(output: &str) -> Vec<FileChange> {
 pub fn attribute_new_changes(before: &[FileChange], after: &[FileChange]) -> Vec<FileChange> {
     after
         .iter()
-        .filter(|c| !before.iter().any(|b| b.path == c.path && b.status == c.status))
+        .filter(|c| {
+            !before
+                .iter()
+                .any(|b| b.path == c.path && b.status == c.status)
+        })
         .cloned()
         .collect()
 }

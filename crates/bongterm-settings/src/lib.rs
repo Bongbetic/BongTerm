@@ -105,6 +105,12 @@ impl Settings {
     }
 }
 
+/// Returns the JSON Schema for [`Settings`] as a [`serde_json::Value`].
+///
+/// # Panics
+///
+/// Panics if the generated schema cannot be converted to a
+/// [`serde_json::Value`], which should never happen for the static schema.
 #[must_use]
 pub fn settings_schema_json() -> serde_json::Value {
     let schema = schemars::schema_for!(Settings);
@@ -206,8 +212,7 @@ pub trait SettingsWriter: Send + Sync {
 
 impl SettingsWriter for FileSettingsProvider {
     fn write(&self, settings: &Settings) -> Result<(), SettingsError> {
-        let json =
-            serde_json::to_string_pretty(settings).expect("Settings must serialize to JSON");
+        let json = serde_json::to_string_pretty(settings).expect("Settings must serialize to JSON");
         // Atomic: write to tmp then rename so readers never see a partial file.
         let tmp = self.path.with_extension("tmp");
         std::fs::write(&tmp, json.as_bytes()).map_err(|source| SettingsError::Io {
@@ -238,17 +243,22 @@ impl MockSettingsWriter {
     }
 
     /// Configure the mock to return an error on every subsequent `write` call.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn set_fail(&self, should_fail: bool) {
         *self.fail.lock().expect("lock not poisoned") = should_fail;
     }
 
     /// All [`Settings`] values passed to [`SettingsWriter::write`] in call order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     #[must_use]
     pub fn write_calls(&self) -> Vec<Settings> {
-        self.write_calls
-            .lock()
-            .expect("lock not poisoned")
-            .clone()
+        self.write_calls.lock().expect("lock not poisoned").clone()
     }
 }
 
@@ -356,6 +366,9 @@ mod tests {
         );
     }
 
+    // Exact-value comparison is intended: the parsed font_size must equal the
+    // literal 15 written in the JSON5 source.
+    #[allow(clippy::float_cmp)]
     #[test]
     fn parses_json5_settings() {
         let raw = r#"
@@ -435,12 +448,18 @@ mod tests {
         let restored: KeybindingSettings = serde_json::from_str(&json).unwrap();
         assert_eq!(original.split_pane, restored.split_pane);
         assert_eq!(original.find_in_pane, restored.find_in_pane);
-        assert_eq!(original.open_resource_dashboard, restored.open_resource_dashboard);
+        assert_eq!(
+            original.open_resource_dashboard,
+            restored.open_resource_dashboard
+        );
         assert_eq!(original.cmd_k, restored.cmd_k);
         assert_eq!(original.smart_history, restored.smart_history);
         assert_eq!(original.explain_last_failed, restored.explain_last_failed);
         assert_eq!(original.attach_context, restored.attach_context);
-        assert_eq!(original.toggle_background_jobs, restored.toggle_background_jobs);
+        assert_eq!(
+            original.toggle_background_jobs,
+            restored.toggle_background_jobs
+        );
     }
 
     #[test]
@@ -449,12 +468,27 @@ mod tests {
         let text = serde_json::to_string(&schema).unwrap();
         assert!(text.contains("split_pane"), "schema missing split_pane");
         assert!(text.contains("find_in_pane"), "schema missing find_in_pane");
-        assert!(text.contains("open_resource_dashboard"), "schema missing open_resource_dashboard");
+        assert!(
+            text.contains("open_resource_dashboard"),
+            "schema missing open_resource_dashboard"
+        );
         assert!(text.contains("cmd_k"), "schema missing cmd_k");
-        assert!(text.contains("smart_history"), "schema missing smart_history");
-        assert!(text.contains("explain_last_failed"), "schema missing explain_last_failed");
-        assert!(text.contains("attach_context"), "schema missing attach_context");
-        assert!(text.contains("toggle_background_jobs"), "schema missing toggle_background_jobs");
+        assert!(
+            text.contains("smart_history"),
+            "schema missing smart_history"
+        );
+        assert!(
+            text.contains("explain_last_failed"),
+            "schema missing explain_last_failed"
+        );
+        assert!(
+            text.contains("attach_context"),
+            "schema missing attach_context"
+        );
+        assert!(
+            text.contains("toggle_background_jobs"),
+            "schema missing toggle_background_jobs"
+        );
     }
 
     #[test]
@@ -558,9 +592,15 @@ mod tests {
         let json = serde_json::to_string(&s).unwrap();
         let s2: Settings = serde_json::from_str(&json).unwrap();
         assert_eq!(s.onboarding.completed, s2.onboarding.completed);
-        assert_eq!(s.onboarding.telemetry_enabled, s2.onboarding.telemetry_enabled);
+        assert_eq!(
+            s.onboarding.telemetry_enabled,
+            s2.onboarding.telemetry_enabled
+        );
         assert_eq!(s.onboarding.default_shell, s2.onboarding.default_shell);
-        assert_eq!(s.onboarding.shell_integration_enabled, s2.onboarding.shell_integration_enabled);
+        assert_eq!(
+            s.onboarding.shell_integration_enabled,
+            s2.onboarding.shell_integration_enabled
+        );
     }
 
     #[test]

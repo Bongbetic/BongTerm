@@ -30,19 +30,24 @@ impl PtyReaderTask {
     #[must_use]
     pub fn spawn(mut reader: Box<dyn Read + Send>, pool: SlabPool, capacity: usize) -> Self {
         let (tx, rx) = mpsc::sync_channel(capacity);
-        let handle = thread::spawn(move || loop {
-            let mut slab = pool.acquire();
-            match reader.read(slab.buf_mut()) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => {
-                    slab.set_used(n);
-                    if tx.send(slab).is_err() {
-                        break;
+        let handle = thread::spawn(move || {
+            loop {
+                let mut slab = pool.acquire();
+                match reader.read(slab.buf_mut()) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        slab.set_used(n);
+                        if tx.send(slab).is_err() {
+                            break;
+                        }
                     }
                 }
             }
         });
-        Self { rx, _handle: handle }
+        Self {
+            rx,
+            _handle: handle,
+        }
     }
 }
 
@@ -74,7 +79,9 @@ mod tests {
 
     #[test]
     fn reader_task_no_data_loss_under_backpressure() {
-        let data: Vec<u8> = (0u64..8192 * 8).map(|i| (i % 256) as u8).collect();
+        let data: Vec<u8> = (0u64..8192 * 8)
+            .map(|i| u8::try_from(i % 256).unwrap())
+            .collect();
         let cursor = Cursor::new(data.clone());
         let pool = SlabPool::new(4);
         let task = PtyReaderTask::spawn(Box::new(cursor), pool, 2); // capacity=2 << 8 slabs
@@ -107,11 +114,16 @@ mod tests {
         }
 
         let pool = SlabPool::new(2);
-        let reader = FailAfterOnce { data: Some(b"ok".to_vec()) };
+        let reader = FailAfterOnce {
+            data: Some(b"ok".to_vec()),
+        };
         let task = PtyReaderTask::spawn(Box::new(reader), pool, 4);
 
         let slab = task.rx.recv().expect("should receive pre-error data");
         assert_eq!(slab.slice(), b"ok");
-        assert!(task.rx.recv().is_err(), "channel should close after IO error");
+        assert!(
+            task.rx.recv().is_err(),
+            "channel should close after IO error"
+        );
     }
 }

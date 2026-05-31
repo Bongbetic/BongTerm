@@ -1,7 +1,7 @@
 //! `BongTerm` resource ledger — sampling and attribution.
 //!
 //! Provides types and port traits for sampling CPU, RSS, I/O, handles, and
-//! VRAM across BongTerm's process tree, plus a view-model for the resource
+//! VRAM across `BongTerm`'s process tree, plus a view-model for the resource
 //! dashboard.
 //!
 //! ## Module ownership
@@ -36,7 +36,7 @@ use parking_lot::Mutex;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ProcessCategory {
-    /// BongTerm host process itself.
+    /// `BongTerm` host process itself.
     BongTerm,
     /// Shell child (powershell.exe, pwsh.exe, cmd.exe, bash.exe, wsl.exe, …).
     Shell,
@@ -46,7 +46,7 @@ pub enum ProcessCategory {
     Agent,
     /// MCP server process.
     McpServer,
-    /// First-party BongTerm plugin (zero-trust, out-of-process).
+    /// First-party `BongTerm` plugin (zero-trust, out-of-process).
     PluginZero,
     /// Process that could not be attributed to a known category.
     Unknown,
@@ -131,7 +131,7 @@ impl ResourceSample {
 
 /// Port for acquiring resource snapshots.
 ///
-/// Real implementation: [`CurrentProcessSampler`] (samples BongTerm + known
+/// Real implementation: [`CurrentProcessSampler`] (samples `BongTerm` + known
 /// child PIDs registered via [`CurrentProcessSampler::register_pid`]).
 /// Test double: [`MockResourceSampler`].
 pub trait ResourceSampler: Send + Sync {
@@ -155,7 +155,7 @@ pub trait VramSampler: Send + Sync {
 
 // ─── CurrentProcessSampler ───────────────────────────────────────────────────
 
-/// [`ResourceSampler`] implementation that measures the current BongTerm
+/// [`ResourceSampler`] implementation that measures the current `BongTerm`
 /// process and any PIDs registered via [`CurrentProcessSampler::register_pid`].
 ///
 /// On Windows, uses `GetProcessMemoryInfo` (RSS), `GetProcessTimes` (CPU),
@@ -165,6 +165,9 @@ pub struct CurrentProcessSampler {
     state: Mutex<SamplerState>,
 }
 
+// The `last_*` prefix is meaningful: each field is the previous sample's value,
+// retained to compute deltas. Renaming would obscure that intent.
+#[allow(clippy::struct_field_names)]
 struct SamplerState {
     last_cpu_time_100ns: u64,
     last_wall: Instant,
@@ -407,9 +410,10 @@ pub fn format_cpu_pct(fraction: f32) -> String {
 mod platform {
     use super::{SamplerState, VramInfo};
 
-    pub(super) fn sample_current_process(
-        state: &mut SamplerState,
-    ) -> (u64, f32, u64, u64, u32) {
+    // `size_of::<PROCESS_MEMORY_COUNTERS>()` fits u32, and the wall-elapsed
+    // nanos/100 value at 1 Hz fits u64 — both `as` casts are in range here.
+    #[allow(clippy::cast_possible_truncation)]
+    pub(super) fn sample_current_process(state: &mut SamplerState) -> (u64, f32, u64, u64, u32) {
         use windows::Win32::{
             Foundation::FILETIME,
             System::{
@@ -423,9 +427,11 @@ mod platform {
 
         // RSS via working set size.
         let rss_bytes = unsafe {
-            let mut mc = PROCESS_MEMORY_COUNTERS::default();
-            mc.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
-            if GetProcessMemoryInfo(handle, &mut mc, mc.cb).is_ok() {
+            let mut mc = PROCESS_MEMORY_COUNTERS {
+                cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+                ..Default::default()
+            };
+            if GetProcessMemoryInfo(handle, &raw mut mc, mc.cb).is_ok() {
                 mc.WorkingSetSize as u64
             } else {
                 0
@@ -434,16 +440,23 @@ mod platform {
 
         // CPU fraction from process CPU time delta vs wall clock delta.
         let cpu_fraction = unsafe {
-            let mut _create = FILETIME::default();
-            let mut _exit = FILETIME::default();
+            let mut create = FILETIME::default();
+            let mut exit = FILETIME::default();
             let mut kernel = FILETIME::default();
             let mut user = FILETIME::default();
-            if GetProcessTimes(handle, &mut _create, &mut _exit, &mut kernel, &mut user).is_ok()
+            if GetProcessTimes(
+                handle,
+                &raw mut create,
+                &raw mut exit,
+                &raw mut kernel,
+                &raw mut user,
+            )
+            .is_ok()
             {
                 let kernel_100ns =
-                    ((kernel.dwHighDateTime as u64) << 32) | kernel.dwLowDateTime as u64;
+                    (u64::from(kernel.dwHighDateTime) << 32) | u64::from(kernel.dwLowDateTime);
                 let user_100ns =
-                    ((user.dwHighDateTime as u64) << 32) | user.dwLowDateTime as u64;
+                    (u64::from(user.dwHighDateTime) << 32) | u64::from(user.dwLowDateTime);
                 let cpu_100ns = kernel_100ns + user_100ns;
                 let wall_elapsed = now.duration_since(state.last_wall);
                 let cpu_delta = cpu_100ns.saturating_sub(state.last_cpu_time_100ns);
@@ -466,8 +479,8 @@ mod platform {
 
     pub(super) fn query_vram() -> Option<VramInfo> {
         use windows::Win32::Graphics::Dxgi::{
-            CreateDXGIFactory1, IDXGIAdapter3, IDXGIFactory1, DXGI_MEMORY_SEGMENT_GROUP,
-            DXGI_QUERY_VIDEO_MEMORY_INFO,
+            CreateDXGIFactory1, DXGI_MEMORY_SEGMENT_GROUP, DXGI_QUERY_VIDEO_MEMORY_INFO,
+            IDXGIAdapter3, IDXGIFactory1,
         };
         use windows::core::Interface;
         unsafe {
@@ -477,7 +490,7 @@ mod platform {
             // DXGI_MEMORY_SEGMENT_GROUP(0) = DXGI_MEMORY_SEGMENT_GROUP_LOCAL
             let mut info = DXGI_QUERY_VIDEO_MEMORY_INFO::default();
             adapter3
-                .QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP(0), &mut info)
+                .QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP(0), &raw mut info)
                 .ok()?;
             Some(VramInfo {
                 used_bytes: info.CurrentUsage,
@@ -491,9 +504,7 @@ mod platform {
 mod platform {
     use super::{SamplerState, VramInfo};
 
-    pub(super) fn sample_current_process(
-        state: &mut SamplerState,
-    ) -> (u64, f32, u64, u64, u32) {
+    pub(super) fn sample_current_process(state: &mut SamplerState) -> (u64, f32, u64, u64, u32) {
         // Non-Windows stub: update wall timestamp, return zeros.
         state.last_wall = std::time::Instant::now();
         (0, 0.0, 0, 0, 0)
@@ -561,6 +572,8 @@ mod tests {
 
     // ── VramInfo ───────────────────────────────────────────────────────────
 
+    // Exact sentinel: the zero-budget branch returns the literal 0.0.
+    #[allow(clippy::float_cmp)]
     #[test]
     fn vram_used_fraction_zero_budget_returns_zero() {
         let v = VramInfo {
@@ -579,6 +592,8 @@ mod tests {
         assert!((v.used_fraction() - 0.5).abs() < 1e-5);
     }
 
+    // Exact sentinel: clamp(0.0, 1.0) returns the literal 1.0 upper bound.
+    #[allow(clippy::float_cmp)]
     #[test]
     fn vram_used_fraction_clamped_to_one() {
         let v = VramInfo {

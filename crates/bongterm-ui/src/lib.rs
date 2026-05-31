@@ -207,8 +207,16 @@ impl CommandPalette {
 pub struct KeyboardMap;
 
 impl KeyboardMap {
+    // Kept as a `&self` method (not an associated fn) for call-site ergonomics
+    // and API stability: callers invoke `keymap.shortcut_for(..)`. KeyboardMap is
+    // a ZST, so the `&self` receiver is zero-cost.
+    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     #[must_use]
-    pub fn shortcut_for<'a>(&self, command: CommandId, keybindings: &'a KeybindingSettings) -> &'a str {
+    pub fn shortcut_for<'a>(
+        &self,
+        command: CommandId,
+        keybindings: &'a KeybindingSettings,
+    ) -> &'a str {
         match command {
             CommandId::OpenCommandPalette => &keybindings.command_palette,
             CommandId::ReloadSettings => "",
@@ -293,6 +301,10 @@ pub enum OnboardingStep {
 }
 
 impl OnboardingStep {
+    // Explicit per-step transitions kept for readability: the terminal
+    // `Finish => Finish` self-loop is intentional and worth showing alongside
+    // the `ResourceBudgets => Finish` edge even though both land on Finish.
+    #[allow(clippy::match_same_arms)]
     fn next(self) -> Self {
         match self {
             Self::Welcome => Self::Shell,
@@ -384,6 +396,10 @@ pub enum ShellMessage {
 // Shell
 // ---------------------------------------------------------------------------
 
+// Each bool is an independent UI toggle (sidebar/dashboard/palette/onboarding)
+// with its own message-driven lifecycle; bundling them into a flags type would
+// obscure intent without changing behavior.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct BongTermShell {
     workspace_name: String,
@@ -444,6 +460,9 @@ impl BongTermShell {
         format!("BongTerm - {}", self.workspace_name)
     }
 
+    // Kept as a `&self` method for API stability (callers use
+    // `shell.region_names()`); the region set is fixed and does not read state.
+    #[allow(clippy::unused_self)]
     #[must_use]
     pub const fn region_names(&self) -> [&'static str; 7] {
         [
@@ -491,6 +510,11 @@ impl BongTermShell {
         (Self::default(), Task::none())
     }
 
+    // match_same_arms: the empty `NoOp` arm is kept distinct from the empty
+    //   agent/approval arms — they are semantically different messages.
+    // collapsible_if: the nested `if let Some(cmd)` / `if active` is left
+    //   un-collapsed so the `// Disabled commands` else-path comment stays put.
+    #[allow(clippy::match_same_arms, clippy::collapsible_if)]
     pub fn update(&mut self, message: ShellMessage) -> Task<ShellMessage> {
         match message {
             ShellMessage::NoOp => {}
@@ -510,13 +534,19 @@ impl BongTermShell {
             }
             ShellMessage::PaletteSelectNext => {
                 if self.command_palette_open {
-                    let count = self.command_palette.filter(self.palette_state.query()).len();
+                    let count = self
+                        .command_palette
+                        .filter(self.palette_state.query())
+                        .len();
                     self.palette_state.select_next(count);
                 }
             }
             ShellMessage::PaletteSelectPrev => {
                 if self.command_palette_open {
-                    let count = self.command_palette.filter(self.palette_state.query()).len();
+                    let count = self
+                        .command_palette
+                        .filter(self.palette_state.query())
+                        .len();
                     self.palette_state.select_prev(count);
                 }
             }
@@ -551,9 +581,13 @@ impl BongTermShell {
         Task::none()
     }
 
+    // `&self` is required: this is passed as `fn(&State) -> Subscription` to
+    // `iced::application(..).subscription(BongTermShell::subscription)`. The
+    // event subscription is global, so the receiver is unused but mandatory.
+    #[allow(clippy::unused_self)]
     pub fn subscription(&self) -> iced::Subscription<ShellMessage> {
         use iced::event::Event;
-        use iced::keyboard::{self, key::Named, Key};
+        use iced::keyboard::{self, Key, key::Named};
 
         // Spike S3b confirmed: listen_raw(event, status, window) delivers all events.
         iced::event::listen_raw(|event, _status, _window| {
@@ -572,8 +606,7 @@ impl BongTermShell {
                         return Some(ShellMessage::PaletteExecuteSelected);
                     }
                     Key::Character("p")
-                        if modifiers
-                            == keyboard::Modifiers::CTRL | keyboard::Modifiers::SHIFT =>
+                        if modifiers == keyboard::Modifiers::CTRL | keyboard::Modifiers::SHIFT =>
                     {
                         return Some(ShellMessage::OpenCommandPalette);
                     }
@@ -610,6 +643,7 @@ impl BongTermShell {
         }
     }
 
+    #[must_use]
     pub fn view(&self) -> Element<'_, ShellMessage> {
         let main = self.main_view();
         if self.onboarding_active {
@@ -641,7 +675,9 @@ impl BongTermShell {
             .width(540)
             .padding(8)
             .style(|_theme: &Theme| iced::widget::container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.18))),
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.15, 0.15, 0.18,
+                ))),
                 border: iced::Border {
                     color: iced::Color::from_rgb(0.35, 0.35, 0.45),
                     width: 1.0,
@@ -685,25 +721,20 @@ impl BongTermShell {
 
         let body = self.onboarding_step_body();
 
-        let card = container(
-            column![
-                text(step_label).size(20),
-                body,
-                next_btn,
-            ]
-            .spacing(16),
-        )
-        .width(480)
-        .padding(24)
-        .style(|_theme: &Theme| iced::widget::container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgb(0.12, 0.12, 0.15))),
-            border: iced::Border {
-                color: iced::Color::from_rgb(0.35, 0.35, 0.45),
-                width: 1.0,
-                radius: 12.0.into(),
-            },
-            ..Default::default()
-        });
+        let card = container(column![text(step_label).size(20), body, next_btn,].spacing(16))
+            .width(480)
+            .padding(24)
+            .style(|_theme: &Theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.12, 0.12, 0.15,
+                ))),
+                border: iced::Border {
+                    color: iced::Color::from_rgb(0.35, 0.35, 0.45),
+                    width: 1.0,
+                    radius: 12.0.into(),
+                },
+                ..Default::default()
+            });
 
         container(card)
             .width(Length::Fill)
@@ -768,12 +799,14 @@ impl BongTermShell {
             OnboardingStep::ResourceBudgets => {
                 text("Default resource budgets apply. Adjust in settings.").into()
             }
-            OnboardingStep::Finish => {
-                text("Setup complete. Open a shell to get started.").into()
-            }
+            OnboardingStep::Finish => text("Setup complete. Open a shell to get started.").into(),
         }
     }
 
+    // `&self` is required: passed as `fn(&State) -> Theme` to
+    // `iced::application(..).theme(BongTermShell::theme)`. The theme is fixed and
+    // does not read state, but the receiver is mandatory for the wiring.
+    #[allow(clippy::unused_self)]
     #[must_use]
     pub const fn theme(&self) -> Theme {
         Theme::Dark
@@ -802,7 +835,9 @@ fn palette_row<'a>(
         .width(Length::Fill)
         .style(move |_theme: &Theme| {
             let base_bg = if selected {
-                Some(iced::Background::Color(iced::Color::from_rgb(0.2, 0.3, 0.5)))
+                Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.2, 0.3, 0.5,
+                )))
             } else {
                 None
             };
@@ -820,6 +855,12 @@ fn palette_row<'a>(
         .into()
 }
 
+/// Run the `BongTerm` shell application to completion.
+///
+/// # Errors
+///
+/// Returns an [`iced::Error`] if the windowing/graphics backend fails to
+/// initialize or the application event loop terminates abnormally.
 pub fn run_shell() -> ShellResult {
     iced::application(
         BongTermShell::boot,
@@ -883,14 +924,35 @@ mod tests {
     fn default_keymap_reads_phase1_bindings_from_settings() {
         let settings = KeybindingSettings::default();
         let keymap = KeyboardMap;
-        assert_eq!(keymap.shortcut_for(CommandId::OpenCommandPalette, &settings), "Ctrl+Shift+P");
-        assert_eq!(keymap.shortcut_for(CommandId::NewTab, &settings), "Ctrl+Shift+T");
-        assert_eq!(keymap.shortcut_for(CommandId::ClosePane, &settings), "Ctrl+Shift+W");
-        assert_eq!(keymap.shortcut_for(CommandId::SplitPane, &settings), "Alt+Shift+D");
-        assert_eq!(keymap.shortcut_for(CommandId::FindInPane, &settings), "Ctrl+F");
-        assert_eq!(keymap.shortcut_for(CommandId::OpenResourceDashboard, &settings), "Ctrl+Shift+R");
+        assert_eq!(
+            keymap.shortcut_for(CommandId::OpenCommandPalette, &settings),
+            "Ctrl+Shift+P"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::NewTab, &settings),
+            "Ctrl+Shift+T"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::ClosePane, &settings),
+            "Ctrl+Shift+W"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::SplitPane, &settings),
+            "Alt+Shift+D"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::FindInPane, &settings),
+            "Ctrl+F"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::OpenResourceDashboard, &settings),
+            "Ctrl+Shift+R"
+        );
         assert_eq!(keymap.shortcut_for(CommandId::CmdK, &settings), "Ctrl+K");
-        assert_eq!(keymap.shortcut_for(CommandId::SmartHistory, &settings), "Ctrl+R");
+        assert_eq!(
+            keymap.shortcut_for(CommandId::SmartHistory, &settings),
+            "Ctrl+R"
+        );
     }
 
     #[test]
@@ -900,7 +962,8 @@ mod tests {
         assert!(reload_ids.contains(&CommandId::ReloadSettings));
         let layout_ids: Vec<CommandId> = palette.filter("layout").iter().map(|c| c.id).collect();
         assert!(layout_ids.contains(&CommandId::SplitPane));
-        let resource_ids: Vec<CommandId> = palette.filter("resources").iter().map(|c| c.id).collect();
+        let resource_ids: Vec<CommandId> =
+            palette.filter("resources").iter().map(|c| c.id).collect();
         assert!(resource_ids.contains(&CommandId::OpenResourceDashboard));
     }
 
@@ -1077,7 +1140,10 @@ mod tests {
             shell.update(ShellMessage::PaletteSelectNext);
         }
         shell.update(ShellMessage::PaletteExecuteSelected);
-        assert!(shell.command_palette_open(), "palette must stay open for disabled command");
+        assert!(
+            shell.command_palette_open(),
+            "palette must stay open for disabled command"
+        );
     }
 
     // --- 1.A.4 onboarding tests ---
@@ -1140,7 +1206,10 @@ mod tests {
     fn shell_active_when_onboarding_not_completed() {
         use bongterm_settings::OnboardingSettings;
         let settings = Settings {
-            onboarding: OnboardingSettings { completed: false, ..OnboardingSettings::default() },
+            onboarding: OnboardingSettings {
+                completed: false,
+                ..OnboardingSettings::default()
+            },
             ..Settings::default()
         };
         let shell = BongTermShell::with_settings(settings);
@@ -1151,7 +1220,10 @@ mod tests {
     fn shell_inactive_when_onboarding_completed() {
         use bongterm_settings::OnboardingSettings;
         let settings = Settings {
-            onboarding: OnboardingSettings { completed: true, ..OnboardingSettings::default() },
+            onboarding: OnboardingSettings {
+                completed: true,
+                ..OnboardingSettings::default()
+            },
             ..Settings::default()
         };
         let shell = BongTermShell::with_settings(settings);

@@ -96,7 +96,10 @@ impl SidecarChunkWriter {
         file.write_all(&buf)?;
         file.flush()?;
 
-        Ok(ChunkRef { monotonic_id, hash: hash_bytes })
+        Ok(ChunkRef {
+            monotonic_id,
+            hash: hash_bytes,
+        })
     }
 
     /// `fsync` the file to durable storage.
@@ -120,7 +123,9 @@ impl SidecarReader {
     /// Create a reader for the chunk file at `path`.
     #[must_use]
     pub fn open(path: &Path) -> Self {
-        Self { path: path.to_path_buf() }
+        Self {
+            path: path.to_path_buf(),
+        }
     }
 
     /// Read all valid frames from the file.
@@ -180,7 +185,7 @@ impl SidecarReader {
 /// Enumerate `.bin` sidecar files in `chunks_dir`.
 ///
 /// Used at startup to identify chunk files that may belong to sessions
-/// whose SQLite records were not flushed before a crash.
+/// whose `SQLite` records were not flushed before a crash.
 ///
 /// Returns an empty `Vec` when the directory does not exist.
 #[must_use]
@@ -194,7 +199,7 @@ pub fn scan_for_recovery(chunks_dir: &Path) -> Vec<PathBuf> {
     entries
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |ext| ext == "bin"))
+        .filter(|p| p.extension().is_some_and(|ext| ext == "bin"))
         .collect()
 }
 
@@ -237,7 +242,9 @@ mod tests {
             assert_eq!(r.monotonic_id, i);
         }
 
-        let chunks = SidecarReader::open(&path).read_valid_chunks().expect("read");
+        let chunks = SidecarReader::open(&path)
+            .read_valid_chunks()
+            .expect("read");
         assert_eq!(chunks.len(), 5);
         for (i, (id, payload)) in chunks.iter().enumerate() {
             assert_eq!(*id, i as u64);
@@ -269,7 +276,9 @@ mod tests {
             file.write_all(bad_payload).unwrap();
         }
 
-        let chunks = SidecarReader::open(&path).read_valid_chunks().expect("read");
+        let chunks = SidecarReader::open(&path)
+            .read_valid_chunks()
+            .expect("read");
         assert_eq!(chunks.len(), 1, "only the valid frame should be returned");
         assert_eq!(&chunks[0].1, b"good chunk".as_slice());
     }

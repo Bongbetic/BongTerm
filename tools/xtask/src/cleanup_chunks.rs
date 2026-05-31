@@ -29,7 +29,10 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
     if !chunks_dir.exists() {
-        println!("No chunks directory at {}; nothing to clean.", chunks_dir.display());
+        println!(
+            "No chunks directory at {}; nothing to clean.",
+            chunks_dir.display()
+        );
         return Ok(());
     }
 
@@ -81,7 +84,7 @@ fn remove_orphaned(chunks_dir: &Path, known_ids: &HashSet<String>) -> Result<usi
     for entry in std::fs::read_dir(chunks_dir).context("read chunks dir")? {
         let entry = entry.context("read dir entry")?;
         let path = entry.path();
-        if path.extension().map_or(true, |e| e != "bin") {
+        if path.extension().is_none_or(|e| e != "bin") {
             continue;
         }
         let stem = path
@@ -90,8 +93,7 @@ fn remove_orphaned(chunks_dir: &Path, known_ids: &HashSet<String>) -> Result<usi
             .unwrap_or("")
             .to_owned();
         if !known_ids.contains(&stem) {
-            std::fs::remove_file(&path)
-                .with_context(|| format!("remove {}", path.display()))?;
+            std::fs::remove_file(&path).with_context(|| format!("remove {}", path.display()))?;
             println!("  removed orphan: {}", path.display());
             removed += 1;
         }

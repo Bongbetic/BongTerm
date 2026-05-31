@@ -44,7 +44,10 @@ pub enum CorpusError {
     #[error("io error reading corpus: {0}")]
     Io(String),
     #[error("parse error in {file}: {source}")]
-    Parse { file: String, source: serde_json::Error },
+    Parse {
+        file: String,
+        source: serde_json::Error,
+    },
 }
 
 /// Load every `*.json` scenario in `dir`.
@@ -58,9 +61,11 @@ pub fn load_dir(dir: impl AsRef<Path>) -> Result<Vec<InjectionScenario>, CorpusE
             continue;
         }
         let text = std::fs::read_to_string(&path).map_err(|e| CorpusError::Io(e.to_string()))?;
-        let scenario: InjectionScenario = serde_json::from_str(&text).map_err(|source| {
-            CorpusError::Parse { file: path.display().to_string(), source }
-        })?;
+        let scenario: InjectionScenario =
+            serde_json::from_str(&text).map_err(|source| CorpusError::Parse {
+                file: path.display().to_string(),
+                source,
+            })?;
         out.push(scenario);
     }
     Ok(out)
@@ -89,7 +94,10 @@ mod tests {
     #[test]
     fn load_dir_reads_all_scenarios_and_enforces_minimum() {
         // Uses the real fixtures dir created in Task 2.C.3b.
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/prompt_injection");
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/prompt_injection"
+        );
         let scenarios = load_dir(dir).expect("load corpus");
         assert!(
             scenarios.len() >= 30,
@@ -106,7 +114,10 @@ mod tests {
 
     #[test]
     fn classifier_detection_matches_expected_for_every_scenario() {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/prompt_injection");
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/prompt_injection"
+        );
         for s in load_dir(dir).unwrap() {
             let detected = crate::classify::is_suspected_injection(&s.poisoned_content);
             assert_eq!(

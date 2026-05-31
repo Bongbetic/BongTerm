@@ -2,7 +2,7 @@
 //!
 //! # Safety
 //!
-//! `rusqlite::Connection` is `!Send` because it holds thread-local SQLite
+//! `rusqlite::Connection` is `!Send` because it holds thread-local `SQLite`
 //! error state. We wrap it in a `parking_lot::Mutex` which guarantees
 //! exclusive access at any given time. The `unsafe impl Send + Sync` below is
 //! sound: we never rely on the thread-local error state — all errors propagate
@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS ledger_samples (
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Takes the error by value so it can be used directly as `.map_err(db_err)` at
+// ~20 call sites; `map_or`/`map_err` hand the closure an owned `rusqlite::Error`.
+#[allow(clippy::needless_pass_by_value)]
 fn db_err(e: rusqlite::Error) -> StorageError {
     StorageError::Database(e.to_string())
 }
@@ -144,14 +147,19 @@ impl SqliteStore {
         let conn = rusqlite::Connection::open(path).map_err(db_err)?;
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")
             .map_err(db_err)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Open an in-memory database (for tests).
     pub fn open_in_memory() -> Result<Self, StorageError> {
         let conn = rusqlite::Connection::open_in_memory().map_err(db_err)?;
-        conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(db_err)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .map_err(db_err)?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 }
 
@@ -449,6 +457,9 @@ impl AgentRunRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl TranscriptRepo for SqliteStore {
+    // chunk_index is a non-negative monotonic counter; SQLite stores INTEGER as
+    // i64, so the u64->i64 cast is in range for any realistic chunk count.
+    #[allow(clippy::cast_possible_wrap)]
     fn append_chunk(&self, row: &TranscriptRow) -> Result<(), StorageError> {
         let conn = self.conn.lock();
         conn.execute(
@@ -506,6 +517,9 @@ impl TranscriptRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl McpCallRepo for SqliteStore {
+    // duration_ms is a non-negative elapsed-millis count; SQLite stores INTEGER
+    // as i64, so the u64->i64 cast is in range for any realistic duration.
+    #[allow(clippy::cast_possible_wrap)]
     fn insert_call(&self, row: &McpCallRow) -> Result<(), StorageError> {
         let conn = self.conn.lock();
         conn.execute(
@@ -517,7 +531,7 @@ impl McpCallRepo for SqliteStore {
                 encode_uuid(row.agent_run_id.0),
                 &row.tool_name,
                 row.duration_ms as i64,
-                row.succeeded as i32,
+                i32::from(row.succeeded),
             ],
         )
         .map_err(db_err)?;
@@ -566,6 +580,9 @@ impl McpCallRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl LedgerRepo for SqliteStore {
+    // rss_bytes is a non-negative process-memory counter; SQLite stores INTEGER
+    // as i64, so the u64->i64 cast is in range on supported targets.
+    #[allow(clippy::cast_possible_wrap)]
     fn record_sample(
         &self,
         ts: time::OffsetDateTime,
@@ -767,9 +784,7 @@ mod tests {
     #[test]
     fn transcript_list_empty_for_unknown_run() {
         let store = migrated();
-        let chunks = store
-            .list_chunks(AgentRunId(Uuid::new_v4()))
-            .expect("list");
+        let chunks = store.list_chunks(AgentRunId(Uuid::new_v4())).expect("list");
         assert!(chunks.is_empty());
     }
 
@@ -797,9 +812,7 @@ mod tests {
     #[test]
     fn mcp_calls_empty_for_unknown_run() {
         let store = migrated();
-        let calls = store
-            .list_calls(AgentRunId(Uuid::new_v4()))
-            .expect("list");
+        let calls = store.list_calls(AgentRunId(Uuid::new_v4())).expect("list");
         assert!(calls.is_empty());
     }
 

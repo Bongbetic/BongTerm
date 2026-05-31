@@ -51,6 +51,9 @@ pub struct ApprovalQueue {
 
 impl ApprovalQueue {
     /// Evaluate `request`; allow -> `Proceed`, otherwise hold and return `Held`.
+    // Explicit per-decision arms kept for readability: RequireApproval and Deny
+    // both hold the action but are distinct policy outcomes worth listing apart.
+    #[allow(clippy::match_same_arms)]
     pub fn submit(&mut self, evaluator: &dyn PolicyEvaluator, request: PolicyRequest) -> Gate {
         match evaluator.evaluate(&request) {
             Decision::Allow => Gate::Proceed,
@@ -96,6 +99,9 @@ impl ApprovalQueue {
     /// Resolve a pending item. A `Deny`-enforced item is always `Rejected`,
     /// even if the user tries to approve it. Returns the resulting state, or
     /// `None` if the id is unknown / already resolved.
+    // Explicit per-(enforcement, decision) arms kept for readability: the
+    // Deny-overrides-approve rule must be visibly distinct from a user Reject.
+    #[allow(clippy::match_same_arms)]
     pub fn resolve(&mut self, id: ApprovalId, decision: ApprovalDecision) -> Option<ApprovalState> {
         let item = self
             .items
@@ -114,7 +120,9 @@ impl ApprovalQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bongterm_security::{Decision, EnforcementLevel, MockPolicyEvaluator, PolicyRequest, RiskClass};
+    use bongterm_security::{
+        Decision, EnforcementLevel, MockPolicyEvaluator, PolicyRequest, RiskClass,
+    };
 
     fn req(action: &str) -> PolicyRequest {
         PolicyRequest {

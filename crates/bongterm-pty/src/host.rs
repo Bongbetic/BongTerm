@@ -69,7 +69,7 @@ pub struct PortablePtyHost;
 
 impl PtyHost for PortablePtyHost {
     fn spawn(&self, spec: ChildSpec) -> Result<PtyChild> {
-        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+        use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
         let pty_system = native_pty_system();
         let pair = pty_system.openpty(PtySize {
@@ -157,9 +157,7 @@ mod tests {
     fn portable_pty_host_writer_accepts_input() {
         use std::io::Write;
         let h = PortablePtyHost;
-        let mut child = h
-            .spawn(cmd_spec(vec!["/K"]))
-            .expect("spawn should succeed");
+        let mut child = h.spawn(cmd_spec(vec!["/K"])).expect("spawn should succeed");
         assert!(child.writer.write_all(b"exit\r\n").is_ok());
     }
 }
