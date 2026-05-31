@@ -35,7 +35,7 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95 (CI not yet run; `master`-vs-`main` trigger mismatch). **`1.exit` measurable subset done** (gates #1,#5-RSS,#8,#28,#29 built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4,#5-VRAM,#6,#7,#17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95 (CI not yet run; `master`-vs-`main` trigger mismatch). **`1.exit` measurable subset done** (gates #1, #8, #28, #29 fully done + #5-RSS *partial* headless tripwire, built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4, #5 (full RSS+VRAM), #6, #7, #17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; `[next]` = `2.replan` | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
@@ -46,7 +46,7 @@
 
 - Working tree clean; submodule `vendor/wezterm` clean at `5046fc22` (has untracked `graphify-out/` noise inside it — ignore); stray untracked `.repograph/` at root (tool artifact, not committed).
 - `ci.yml` passes all 7 steps **in a local stable-1.95 reproduction**; not yet confirmed on GitHub CI (trigger mismatch below). After this session: `cargo test --workspace` = **350 pass / 0 fail**; `cargo fmt --all -- --check` + `cargo clippy --workspace --all-targets --all-features -- -D warnings` clean.
-- `nightly.yml`: gates **#15, #24** (Phase 2) + **#1, #5-RSS, #8, #28, #29** (Phase 1 measurable subset) wired + green locally.
+- `nightly.yml`: gates **#15, #24** (Phase 2) + **#1, #8, #28, #29** (Phase 1, full) + **#5-RSS** (Phase 1, *partial* headless tripwire) wired + green locally.
 - Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md`; gate triage: `docs/phase1-exit-gates.md`.
 
 ### Next actionables (priority order)
@@ -133,8 +133,9 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 **Implementation outline:**
 
 - [block] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies *(blocked on the integration gates below + 7 nightly runs)*
-  - **Measurable subset DONE this session** (commits `b81eaf0`→`2e0947e`, green locally, wired into `nightly.yml`): **#1** shell-smoke (real ConPTY→parser→snapshot per profile; PASS CMD/WinPS/PS7/SSH, skip-log Git Bash/WSL), **#5-RSS** (real `CurrentProcessSampler`; core RSS 9.8 MB ≤120 MB), **#8** blocks (fixture corpus + p99 500 ns ≤5 ms), **#28** settings (backup+SafeMode+migration built), **#29** storage recovery (torn/checksum/corrupt-DB). See `docs/phase1-exit-gates.md`.
-  - **Remaining = blocked on renderer/subsystem integration** (do NOT fake green — all need the real subsystems wired into `bongterm-app` + a GPU/display + a human visual check): **#4** cold-start-to-first-frame, **#5-VRAM**, **#6** idle CPU (render loop), **#7** split panes (mux unwired), **#17** dashboard attribution (ledger unwired; also `CurrentProcessSampler::register_pid` is documented but unimplemented). This is the SHIP-READINESS "wire the real renderer + re-integrate subsystems" step — its own session.
+  - **Fully DONE this session** (commits `b81eaf0`→`2e0947e`, green locally, wired into `nightly.yml`): **#1** shell-smoke (real ConPTY→parser→snapshot per profile; PASS CMD/WinPS/PS7/SSH, skip-log Git Bash/WSL), **#8** blocks (fixture corpus + p99 500 ns ≤5 ms), **#28** settings (backup+SafeMode+migration built), **#29** storage recovery (torn/checksum/corrupt-DB). See `docs/phase1-exit-gates.md`.
+  - **PARTIAL — #5-RSS** wired as a *headless engine-core lower-bound tripwire* only (real `CurrentProcessSampler`; 9.8 MB) — it does **not** spin up the window/wgpu/render loop, so it does **not** verify the full-app 120 MB budget (renderer-dominated). Does **not** count as #5 done.
+  - **Remaining = blocked on renderer/subsystem integration** (do NOT fake green — all need the real subsystems wired into `bongterm-app` + a GPU/display + a human visual check): **#4** cold-start-to-first-frame, **#5** full-app RSS + VRAM, **#6** idle CPU (render loop), **#7** split panes (mux unwired), **#17** dashboard attribution (ledger unwired; also `CurrentProcessSampler::register_pid` is documented but unimplemented — but its per-pane contract is set by the app integration, so build it *with* that wiring, not in isolation). This is the SHIP-READINESS "wire the real renderer + re-integrate subsystems" step — its own session, ideally interactive with a human running the GUI.
   - ⚠ Gate criteria are canonical in spec §6.1; the set {1,4,5,6,7,8,17,28,29} is **not** "perf gates" (#2/#3 are the renderer-perf gates, deliberately excluded from Phase 1). §6.1 **#2/#3/#27** are in no phase exit set — land #2/#3 when the renderer is wired, #27 at release review.
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 

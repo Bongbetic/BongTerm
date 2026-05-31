@@ -14,16 +14,18 @@ task authority; this is the working state for the nine Phase-1 exit gates.
 >
 > | Gate | Result | CI step |
 > |---|---|---|
-> | #1 shell-smoke | PASS 4/6 (CMD, WinPS, PS7, SSH); skip-log Git Bash, WSL | `cargo test -p bongterm-app --test gate01_shell_smoke` |
-> | #5 RSS | core RSS **9.8 MB** ≤ 120 MB | `cargo test -p bongterm-app --test gate05_rss` |
-> | #8 blocks | fixture corpus green + detection p99 **500 ns** ≤ 5 ms | `cargo test -p bongterm-blocks` |
-> | #28 settings | backup + Safe Mode + v1→v2 migration built + tested | `cargo test -p bongterm-settings --test gate28_settings_recovery` |
-> | #29 storage | torn / checksum / corrupt-DB recovery | `cargo test -p bongterm-storage-sqlite --test gate29_storage_recovery_suite` |
+> | #1 shell-smoke | ✅ DONE — PASS 4/6 (CMD, WinPS, PS7, SSH); skip-log Git Bash, WSL | `cargo test -p bongterm-app --test gate01_shell_smoke` |
+> | #5 RSS | ⚠ **PARTIAL** — headless engine-core lower-bound **9.8 MB** (no window/wgpu/render loop; does NOT verify the full-app 120 MB budget) | `cargo test -p bongterm-app --test gate05_rss` |
+> | #8 blocks | ✅ DONE — fixture corpus green + detection p99 **500 ns** ≤ 5 ms | `cargo test -p bongterm-blocks` |
+> | #28 settings | ✅ DONE — backup + Safe Mode + v1→v2 migration built + tested | `cargo test -p bongterm-settings --test gate28_settings_recovery` |
+> | #29 storage | ✅ DONE — torn / checksum / corrupt-DB recovery | `cargo test -p bongterm-storage-sqlite --test gate29_storage_recovery_suite` |
 >
 > **Still BLOCKED** (integration + GPU/display + human visual — do not fake): #4,
-> #5-VRAM, #6, #7, #17. These are the next session's "wire renderer/mux/ledger into
-> the app" work. `1.exit` overall stays open until these land **and** the nightly is
-> green for 7 consecutive runs on real CI.
+> **#5 full-app RSS + VRAM**, #6, #7, #17. The #5-RSS tripwire above is a floor on
+> the engine, not the gate — re-measure full-app RSS when the renderer is wired.
+> These are the next session's "wire renderer/mux/ledger into the app" work.
+> `1.exit` overall stays open until these land **and** the nightly is green for 7
+> consecutive runs on real CI.
 
 ---
 

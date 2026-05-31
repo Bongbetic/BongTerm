@@ -5,12 +5,20 @@
 //! sampler** (`bongterm-ledger::CurrentProcessSampler` → `GetProcessMemoryInfo`).
 //! This measures the actual terminal core doing its job, not an empty process.
 //!
+//! ⚠ **PARTIAL gate — lower-bound tripwire, NOT full-gate verification.**
+//! This test process links `bongterm-app` but never creates the window, the
+//! wgpu device, the glyph atlas, or the render loop — which are exactly what
+//! dominate the real app's RSS. So the number here (~10 MB) is a *floor* on the
+//! engine core, not the running-windowed-app figure the spec's 120 MB budget
+//! targets. It is a cheap regression tripwire on the parser/grid engine; it does
+//! NOT discharge gate #5. The full-app #5 (RSS **and** VRAM) must be re-measured
+//! once the renderer is wired into the app — same bucket as #5-VRAM, #4, #6.
+//!
 //! Scope (see `docs/phase1-exit-gates.md`):
 //! - The **VRAM** portion of gate #5 (≤ 256 MB RTX / ≤ 128 MB iGPU) is BLOCKED:
-//!   it needs the real wgpu renderer wired into the app **and** a GPU. Not
-//!   asserted here.
-//! - "Core RSS" = the BongTerm host process working set (children — cmd/conhost
-//!   — are separate PIDs, not counted), matching the spec's "core" definition.
+//!   it needs the real wgpu renderer wired into the app **and** a GPU.
+//! - "Core RSS" here = the host process working set with the renderer absent
+//!   (children — cmd/conhost — are separate PIDs, not counted).
 
 use std::sync::Arc;
 
