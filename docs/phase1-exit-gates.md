@@ -95,6 +95,43 @@ GUI visual check (no headless session can confirm glyphs render).
 
 ---
 
+## Gate #6 (idle CPU) — measured baseline (2026-06-01)
+
+First real idle-CPU measurement of the windowed app on the dev box (12 logical
+cores; matches the Ryzen 5 7535HS reference, 6c/12t). Sampled the live
+`bongterm-app.exe` process (`Get-Process .CPU` delta over a wall window), shell
+idle at a `pwsh` prompt, no input.
+
+| Build | window | cpu-seconds | single-core % | all-core % |
+|---|---|---|---|---|
+| 33 ms tick (shipped) | 15 s | 0.125 | 0.83 % | 0.069 % |
+| 2000 ms tick (diagnostic) | 15 s | 0.031 | 0.21 % | 0.017 % |
+| 2000 ms tick (diagnostic) | 60 s | 0.219 | 0.36 % | 0.030 % |
+
+**Reading vs the gate (`≤ 0.1 %`):** PASSES under all-core normalization
+(Task-Manager convention: 0.03–0.07 %); FAILS under single-core normalization
+(0.36–0.83 %). The spec (§6.1 #6) does not pin the normalization. The honest
+target is the **strict** reading — a terminal should idle at ~0 — so do not
+declare #6 green off the all-core number; that would be gate-gaming.
+
+**Diagnosis.** iced 0.14 is `ControlFlow::Wait`-driven (event-driven, not
+`Poll` — `iced_winit-0.14.0/src/lib.rs:288-296`), so idle redraws are not a
+framework spin. Slowing the tick 60× (33→2000 ms) dropped CPU ~2.3× (0.83→0.36 %
+single-core), i.e. the `time::every(33ms)` tick is a real contributor (each
+`Tick` rebuilds `view()` → re-`prepare`s the shader even when the snapshot is
+unchanged), but a residual floor (~0.3 % single-core at 2000 ms) remains — most
+plausibly the still-firing diagnostic tick's repaints, not a non-timer source.
+
+**Fix (deferred, deliberately):** make terminal I/O event-driven — drop the
+unconditional `time::every` tick and wake only when ConPTY output arrives, via a
+`Subscription` worker that owns the PTY. iced's `Subscription::run` takes a
+`fn()` (no captures), so this inverts ownership (the websocket pattern); shape
+the worker **parameterized by pane id** (`run_with(pane_id, …)`) so Phase-1 #7
+(split panes) is "instantiate N workers + route input", not a teardown. Verify
+the fixed build with the same 60 s sampler; expect single-core ≪ 0.1 %. This is
+its own verifiable increment, done with (or just before) #7 — not a headless CI
+test (needs a display/GPU, like #4 and #5-full).
+
 ## Wiring & verification protocol
 
 1. Build/extend the harness in the owning crate (TDD: red → green).
