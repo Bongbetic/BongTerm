@@ -36,7 +36,7 @@
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
 | **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — all code tasks complete (1.A.4b + 1.B.3 + 1.C.1-5 + 1.D.1-3 + 1.E.1-4 + 1.F.1-4 + 1.G.1-4); `[next]` = 1.exit (CI gate wiring) | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
-| **Phase 2** Agent Observability | 📋 Planned (17 tasks) | — | §6.1 #15,#24 green |
+| **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; `[next]` = `2.replan` | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | 📋 Planned (21 tasks) | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
@@ -128,20 +128,10 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 Gates: spec §6.1 #15, #24.
 
-- 2.A.1 `bongterm-agents::AgentAdapter` production wiring
-- 2.A.2 `ClaudeCodeAdapter::discover` (binary, version, auth)
-- 2.A.3 `ClaudeCodeAdapter::create_classifier` stateful
-- 2.A.4 `CodexCliAdapter::discover` + `create_classifier`
-- 2.A.5 `agent_adapter_conformance` passes for both
-- 2.B.1 Transcript writer (`TranscriptRepo` impl)
-- 2.B.2 File-change tracker via `git status --porcelain=v1`
-- 2.B.3 Approval queue UI with explicit `EnforcementLevel` labels
-- 2.B.4 Replay with summarized context (`summarize_exit` → re-launch with prefilled prompt)
-- 2.C.1 Agent sidebar Iced view
-- 2.C.2 Lifecycle controls: stop / kill process tree / restart
-- 2.C.3 Prompt-injection corpus seed (≥30 scenarios) + `xtask prompt-injection-corpus` real impl
-- 2.exit Phase 2 exit gate: §6.1 #15, #24 green
-- 2.replan **Invoke `superpowers:writing-plans`** for Phase 3
+> **All Phase 2 implementation tasks complete** (2.A.0–2.C.3c + 2.D.1). Commits `5481a30`→`662e31b`. See `docs/codex/phase-status.md` for the per-task table.
+
+- [next] 2.replan **Invoke `superpowers:writing-plans`** for Phase 3
+- 2.exit *(code done — awaiting operational green ×7 nightlies)* — gates #15 + #24 GREEN locally and wired into `.github/workflows/nightly.yml`. Exit also requires the Phase 1 gates (`1.exit`, still pending) for a fully green nightly.
 
 ---
 

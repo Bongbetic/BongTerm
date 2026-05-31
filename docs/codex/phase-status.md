@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase2.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: `2.C.1`
+Current focus: **Phase 2 complete** — all code tasks GREEN; gates #15 + #24 wired into nightly. Next: `2.replan` (invoke `superpowers:writing-plans` for Phase 3).
 
 | Task ID | Status | Last test run | Notes/blockers | Next task |
 | --- | --- | --- | --- | --- |
@@ -21,8 +21,8 @@ Current focus: `2.C.1`
 | 2.B.4 | Complete | `cargo test -p bongterm-agents replay_` (pass, 4 tests) | RED observed first (`ReplayBuilder` missing), then GREEN after implementing `replay.rs` `ReplayBuilder` + `ReplaySpec` prefilled summary context replay | 2.C.2a |
 | 2.C.2a | Complete | `cargo test -p bongterm-agents lifecycle::` (pass, 7 tests) | Previously blocked by missing `ReplayBuilder` in `replay.rs`; rerun after replay implementation sync is GREEN | 2.C.1 |
 | 2.C.1 | Complete | `cargo test -p bongterm-ui agent_sidebar::` (pass, 5 tests) | RED observed first (missing `ShellMessage::{AgentLifecycle,AgentInterrupt,ApprovalResolve}`), then GREEN after adding UI message variants + no-op update arms; required `cargo xtask check-deps` still fails on pre-existing unrelated violation `bongterm-storage-sqlite -> bongterm-test-kit` | 2.C.3a |
-| 2.C.3a | Not started | Not run | - | 2.C.3b |
-| 2.C.3b | Not started | Not run | - | 2.C.3c |
-| 2.C.3c | Not started | Not run | - | 2.D.1 |
-| 2.D.1 | Not started | Not run | - | 2.EXIT |
-| 2.EXIT | Not started | Not run | - | - |
+| 2.C.3a | Complete | `cargo test -p bongterm-agents scenario_deserializes_from_json` (pass) | RED first (`InjectionScenario` missing) → GREEN. `corpus.rs` model + `load_dir`. Commit `31a9c0e` | 2.C.3b |
+| 2.C.3b | Complete | `cargo test -p bongterm-agents corpus::` (3 pass) | 32 fixtures (30 poisoned + 2 benign) under `tests/fixtures/prompt_injection/`; detection-alignment test added. Commit `8c9924a` | 2.C.3c |
+| 2.C.3c | Complete | `cargo test -p xtask prompt_injection_corpus::tests` (6 pass) + `cargo run -p xtask -- prompt-injection-corpus` (`32 scenarios passed gate #24`, exit 0) | Reconciled 2 plan inconsistencies: schema (serde alias `poisoned_content`→`payload`, default `expected_enforcement`) + markers set byte-identical to `classify::INJECTION_MARKERS` (plan's pasted list had drifted, 9 fixtures would miss). Commit `2dd8048` | 2.D.1 |
+| 2.D.1 | Complete | `cargo test -p bongterm-agents --test gate15` (3 pass, 1 ignored) | gate #15 evidence. Adapted to real APIs (`claude-code`/`codex-cli` names, `ProcessExited`+`state()`, Output-event capture). Commit `79fecc2` | 2.EXIT |
+| 2.EXIT | Complete (code) | gates #15 + #24 GREEN locally; `cargo test --workspace` green; `check-deps: ok` | `nightly.yml` created with gates job. **Operational/future:** green ×7 nightlies. **Out-of-scope debt:** workspace `clippy -D warnings` + `fmt --check` fail on pre-existing issues in other crates (1.exit/hygiene). Commit `662e31b` | Phase 3 (after `2.replan`) |

@@ -1,99 +1,60 @@
-# BongTerm Phase 1 Handoff — 2026-05-29
+# BongTerm Handoff — Phase 2 code complete — 2026-05-31
 
-## Session summary
+## TL;DR
 
-Phase 1 implementation **100% complete**. All code tasks done. `[next]` = `1.exit` (wire §6.1 gates into CI).
+- **Repo moved** `C:\Users\souba\Documents\Projects\BongT` → `D:\Programming\Bongbetic\BongT`. Many docs still cite the old path. A stale incremental build cached the old `CARGO_MANIFEST_DIR`, causing 5 phantom `bongterm-blocks` failures — fixed by rebuild. **Run `cargo clean` once** on a fresh clone if you see `os error 3` / path-not-found in fixture tests.
+- **Phase 2 (agent observability) is code-complete.** Tasks 2.C.3a → 2.EXIT landed this session. Both P0 gates (#15, #24) green locally + wired into `nightly.yml`.
+- **The app is still not a working terminal.** See `SHIP-READINESS.md` — `bongterm-app`/`-ui` don't depend on `-pty`/`-term`/`-render`; the window shows placeholder panels. The vertical slice is the real gating work for a usable product. (The user, shown this gap, chose to continue orca.md Phase 2 rather than pivot.)
 
----
-
-## All Phase 1 commits (since Phase 0 exit)
+## This session's commits (on `master`)
 
 | Commit | Task | Summary |
 |--------|------|---------|
-| `8508c11` | 1.D.1 | Pane + tab topology model in `bongterm-mux` |
-| `4c53109` | 1.D.2 | Split h/v, resize, focus cycle |
-| `d03199f` | —    | orca.md status update |
-| `03b1105` | —    | Docs: stale-ref fixes + Phase 2-6 plan files |
-| `d8f502e` | 1.A.4b | `SettingsWriter` port + `FileSettingsProvider::write` (atomic tmp→rename). 20 tests. |
-| `f590b7b` | 1.D.3 | `LayoutSnapshot` + `LayoutRepo` + `MuxRouter::snapshot/restore`. 67 tests. |
-| `c860874` | 1.E.1-4 | OSC 133 FTCS consumer, `Confidence` enum, `BlockBuilder`, `BlockAction`, fixture tests. 32 tests. |
-| `d63b18a` | 1.F.1-4 | `ResourceSampler`, `DxgiVramSampler`, `DashboardViewModel`, Windows+stub impl. 25 tests. |
-| `5d494a0` | 1.G.1-4 | `SqliteStore` (WAL + all 8 repo traits), sidecar chunk writer (BLAKE3), crash recovery scan, `xtask cleanup-chunks` real impl. 22 tests. |
-| `c3f2cbb` | —    | orca.md + handoff.md session 1 update |
-| `a61c906` | 1.B.3 (gitlink) | Gitlink `vendor/wezterm` at `5046fc225992db6ba2ef8812743fadfdfe4b184a` (mode 160000). |
-| `9913f9a` | 1.B.3 (wire) | `WezTermAdapter::ingest_bytes` → `wezterm_term::Terminal::advance_bytes`. `BongtermConfig` minimal `TerminalConfiguration`. Root workspace excludes `vendor/wezterm`. 11 tests. |
-| `339244b` | —    | orca.md + handoff.md phase-complete update |
+| `31a9c0e` | 2.C.3a | `corpus.rs`: `InjectionScenario` model + `load_dir` loader |
+| `8c9924a` | 2.C.3b | 32 injection fixtures (30 poisoned + 2 benign) + detection-alignment test |
+| `2dd8048` | 2.C.3c | `xtask prompt-injection-corpus` gate #24 runner |
+| `79fecc2` | 2.D.1 | `tests/gate15.rs` — gate #15 offline launch + transcript-capture |
+| `662e31b` | 2.EXIT | `nightly.yml` — wire gates #15 + #24 into nightly |
 
-Full workspace `cargo test` = 0 failures on `master`.
+(`+` a docs commit updating `orca.md`, `phase-status.md`, `SHIP-READINESS.md`, this handoff.)
 
----
+## Verification (all run this session)
 
-## Current state
+- `cargo test -p bongterm-agents corpus::` → 3 pass
+- `cargo test -p xtask prompt_injection_corpus::tests` → 6 pass
+- `cargo run -p xtask -- prompt-injection-corpus` → `32 scenarios passed gate #24`, exit 0
+- `cargo test -p bongterm-agents --test gate15` → 3 pass, 1 ignored
+- `cargo test --workspace` → green; `cargo run -p xtask -- check-deps` → ok
 
-- **`[next]` in `orca.md`:** `1.exit` — wire §6.1 gates into CI
-- **No deferred code tasks.** All Phase 1 implementation done.
+## Plan inconsistencies reconciled (read before trusting the Phase 2 plan verbatim)
 
----
+The Phase 2 plan (`docs/superpowers/plans/2026-05-29-bongt-phase2.md`) drifted from the committed code in three places; all reconciled, documented in commit messages:
 
-## Phase 1 exit gates (CI wiring needed)
+1. **2.C.3c schema** — plan's xtask `Scenario` used `payload` + `expected_enforcement`; the 2.C.3a/b fixtures use `poisoned_content` + `provoked_action` (no enforcement). Fixed via `#[serde(alias = "poisoned_content")]` + `#[serde(default)]` on the xtask struct. No fixture churn.
+2. **2.C.3c markers** — plan's pasted `MARKERS` had drifted from the real `classify::INJECTION_MARKERS`; 9 fixtures would have missed. Set `MARKERS` byte-identical to the committed `classify` list (the plan's own stated invariant).
+3. **2.D.1 gate15 APIs** — plan used fictional signatures (`TranscriptSink::append`/`captured_text`, `LifecycleCommand::ObserveExit`, `status_label()`, names "Claude Code"/"Codex CLI"). Real APIs: `capabilities().name` = `claude-code`/`codex-cli`; `ProcessExited` + `state() -> LifecycleState`; transcript captured from `AgentEvent::Output`.
 
-Per spec §6.1 — must be green × 7 consecutive nightly runs:
+## Known gaps / pending items
 
-| Gate | Description | Where to wire |
-|------|-------------|---------------|
-| #1 | keystroke-to-glyph p99 ≤ 5 ms | benchmark harness → CI |
-| #4 | terminal bytes/s throughput | benchmark harness → CI |
-| #5 | RSS ≤ 200 MB steady-state | integration test → CI |
-| #6 | VRAM budget compliance | `DxgiVramSampler` → CI |
-| #7 | shell integration confidence grading | `BlockBuilder` fixture → CI |
-| #8 | block actions available for High/Medium blocks | `BlockAction` test → CI |
-| #17 | settings persist across restart | `FileSettingsProvider` roundtrip → CI |
-| #28 | layout restore on launch | `LayoutRepo` + `MuxRouter::restore` → CI |
-| #29 | resource dashboard shows live values | `DashboardViewModel` → CI |
+- **`1.exit` still pending** (Phase 1 CI gate wiring #1,#4-8,#17,#28,#29). Phase 2 was built ahead of it. A fully green nightly needs both.
+- **Marker drift guard missing.** The plan attributes a `markers_match_xtask_corpus_runner` drift test to 2.A.3; it does not exist. Neither crate imports the other, so it needs a third mechanism (e.g. an `xtask` check that parses both source lists). The two lists are currently equal by hand.
+- **Workspace clippy/fmt debt.** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` fail on pre-existing issues in other crates (`bongterm-settings` missing `# Panics`, `map_or`/match-arm/derivable-impl, etc.) and the nightly-only rustfmt config on the stable toolchain. Phase 2 code itself is clippy-clean. This blocks ci.yml's existing clippy/fmt gates — needs a hygiene pass (1.exit territory).
+- **Uncommitted pre-existing changes** still in the tree (not from this session): `crates/bongterm-storage-sqlite/{Cargo.toml,src/lib.rs}` removes the `bongterm-test-kit` dev-dep + 3 repo-conformance tests to satisfy `check-deps` — a **coverage regression**. Resolve properly (host the storage conformance harness in `bongterm-test-kit`, which already depends on the trait crates, and run it against `SqliteStore` there) or revert. Also `AGENTS.md`, `Cargo.lock` modified.
 
-These are CI checks, not new code. Wire into `.github/workflows/` (skeleton exists).
+## Next actionable
 
----
+`2.replan` — invoke `superpowers:writing-plans` for Phase 3 (Developer UX; outline in `orca.md`). Per orca re-plan rule, also consult the AnythingLLM `engineer` workspace. **Do not implement Phase 3 from outline-level tasks alone.**
 
-## Key architectural decisions (Phase 1)
-
-- **`LayoutSnapshot` topology-only** — rects + focus indices; per-pane cwd/shell in `WorkspaceSnapshot` (bongterm-app). Module ownership matrix binding.
-- **`SqliteStore` uses `unsafe impl Send + Sync`** — `Mutex<Connection>` sound; `Connection` is `!Send` only for thread-local SQLite error state.
-- **No FK REFERENCES in `0001_init.sql`** — conformance tests don't pre-insert parent rows.
-- **Sidecar frame**: `[u64 monotonic_id][u8;32 blake3][u32 len][payload]`. Hash mismatch = torn write; reader stops cleanly.
-- **`CommandBlock.command` always `""`** — PTY input capture deferred. OSC 133 gives prompt boundaries, not typed command.
-- **`vendor/wezterm` gitlink** (mode 160000, `5046fc22`). Root workspace `exclude = ["vendor/wezterm"]` prevents nested-workspace conflict.
-- **`visible_lines` is `#[cfg(test)]` in wezterm-term** — external consumers use `lines_in_phys_range(0..N)`. Fresh terminal has no scrollback so phys-row 0 = visible row 0.
-- **`BongtermConfig`** minimal `TerminalConfiguration`: only `color_palette` required; writer is `Box::new(std::io::sink())` (ConPTY handles input at a higher layer).
-
----
-
-## Phase 2 plan ready
-
-`docs/superpowers/plans/2026-05-29-bongt-phase2.md` — 17 tasks (agent observability: adapters, transcript writer, approval queue, replay, lifecycle controls, prompt-injection corpus).
-
----
+Alternatively (more honest "ship" work, per `SHIP-READINESS.md`): the **vertical slice** — wire `app → ui → {pty, term, render}` so `cargo run -p bongterm-app` shows a live shell. This is the gating work for a usable terminal and is not in orca.md.
 
 ## Key artifacts
 
 | Artifact | Path |
 |----------|------|
+| Ship-readiness audit | `SHIP-READINESS.md` (repo root) |
 | Task authority | `orca.md` |
-| Authoritative spec | `docs/PRD/bongterm_prd_v7.md` |
-| Design doc (gate numbering) | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` |
-| Phase 1 plan | `docs/superpowers/plans/2026-05-28-bongt-phase1.md` |
+| Phase 2 status table | `docs/codex/phase-status.md` |
 | Phase 2 plan | `docs/superpowers/plans/2026-05-29-bongt-phase2.md` |
-| ADRs (0003–0007, all Accepted) | `docs/adr/` |
-| wezterm-term adapter | `crates/bongterm-term/src/adapter.rs` |
+| Execution rules | `AGENTS.md` |
 
----
-
-## Recommended next actions
-
-1. **`1.exit`** — wire §6.1 gates into `.github/workflows/`. Benchmarks #1/#4 need criterion harness; integration tests #17/#28/#29 need fixture runners; resource gates #5/#6 need sampler-driven assertions.
-
-2. **Phase 2** — invoke `superpowers:subagent-driven-development` or `superpowers:executing-plans` against `docs/superpowers/plans/2026-05-29-bongt-phase2.md`.
-
----
-
-*Generated 2026-05-29. All changes on `master`. No sensitive data.*
+*Generated 2026-05-31. All changes on `master`. No sensitive data.*
