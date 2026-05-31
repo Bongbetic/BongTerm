@@ -103,4 +103,17 @@ mod tests {
         ids.dedup();
         assert_eq!(before, ids.len(), "scenario ids must be unique");
     }
+
+    #[test]
+    fn classifier_detection_matches_expected_for_every_scenario() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/prompt_injection");
+        for s in load_dir(dir).unwrap() {
+            let detected = crate::classify::is_suspected_injection(&s.poisoned_content);
+            assert_eq!(
+                detected, s.expected_detected,
+                "scenario {} detection mismatch (expected {})",
+                s.id, s.expected_detected
+            );
+        }
+    }
 }
