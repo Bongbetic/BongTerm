@@ -42,18 +42,19 @@
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-05-31, HEAD `2e0947e`, tree clean)
+### Current status (2026-05-31, HEAD `60755bb`, tree clean)
 
-- Working tree clean; submodule `vendor/wezterm` clean at `5046fc22` (has untracked `graphify-out/` noise inside it — ignore); stray untracked `.repograph/` at root (tool artifact, not committed).
-- `ci.yml` passes all 7 steps **in a local stable-1.95 reproduction**; not yet confirmed on GitHub CI (trigger mismatch below). After this session: `cargo test --workspace` = **350 pass / 0 fail**; `cargo fmt --all -- --check` + `cargo clippy --workspace --all-targets --all-features -- -D warnings` clean.
+- **Real wgpu renderer wired into the app + visually confirmed** (commit `60755bb`): `bongterm-app` now renders the grid through `bongterm-render::TerminalPipeline` (cryoglyph) via Iced's shader widget, replacing the pragmatic iced-`text` grid. The renderer's `prepare`/`draw` (scaffold stubs) are implemented. The user ran `cargo run -p bongterm-app` and confirmed glyphs render on both the old (baseline) and new (wgpu) paths — the long-open "GUI visual unverified" question is now answered ✅.
+- Working tree clean; submodule `vendor/wezterm` clean at `5046fc22` (untracked `graphify-out/` inside it — ignore); stray untracked `.repograph/` at root (tool artifact).
+- `ci.yml` passes all 7 steps in a local stable-1.95 reproduction; not yet on GitHub CI (trigger mismatch below). `cargo test --workspace` = **350 pass / 0 fail**; fmt + clippy (`--workspace -D warnings`) clean.
 - `nightly.yml`: gates **#15, #24** (Phase 2) + **#1, #8, #28, #29** (Phase 1, full) + **#5-RSS** (Phase 1, *partial* headless tripwire) wired + green locally.
 - Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md`; gate triage: `docs/phase1-exit-gates.md`.
 
 ### Next actionables (priority order)
 
-1. **Integration session** (autonomous code + human visual) — wire the real subsystems into `bongterm-app` to unblock the remaining Phase-1 gates: real wgpu renderer (`bongterm-render::TerminalPipeline`) → #4/#5-VRAM/#6; `bongterm-mux` panes → #7; `bongterm-ledger` dashboard + `register_pid`/process-tree attribution → #17. Each needs a GPU/display + a human GUI check; **do not fake these green** (`docs/phase1-exit-gates.md`). Bounded headless-verifiable pre-work exists: build `CurrentProcessSampler::register_pid` + child attribution in `bongterm-ledger` (doc claims it; impl missing).
-2. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml`/`nightly.yml` triggers to `master`, or rename branch), then push/PR so CI runs on `windows-latest`. Local green ≠ CI green.
-3. **GUI visual verify** (human-only) — `cargo run -p bongterm-app`; confirm live shell renders glyphs + typing is visible. No headless session can check this.
+1. **Finish the live-terminal slice** (interactive — code + human visual). Renderer is wired ✅; remaining renderer fidelity: **colour/attributes** (snapshot→renderer is codepoint-only today), **cursor** rendering, **resize** (fixed 80×24 now), **dirty-region / redraw-on-change** (currently full redraw every 33 ms tick → a likely #6 idle-CPU problem). Then **`bongterm-mux` panes** → #7 and **`bongterm-ledger` dashboard + `register_pid`/process-tree attribution** → #17 (build register_pid *with* this wiring — its per-pane contract is integration-defined).
+2. **Measure the renderer-dependent gates** now that the real renderer runs: #4 cold-start-to-first-frame, #5 full-app RSS + VRAM (DXGI sampler), #6 idle CPU, and the orphaned #2/#3 (keystroke-to-glyph p99, throughput). Need a GPU/display; build harnesses, then re-measure #5-RSS for real.
+3. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml`/`nightly.yml` triggers to `master`, or rename the branch), then push/PR so CI runs on `windows-latest`. Local green ≠ CI green.
 
 ### Key known issues / deferred items
 

@@ -2,6 +2,14 @@
 
 ## TL;DR
 
+- **LATE-SESSION (interactive): the real wgpu renderer is wired into the app and
+  visually confirmed** (commit `60755bb`). `bongterm-app` now renders the terminal
+  grid through `bongterm-render::TerminalPipeline` (cryoglyph / cosmic-text 0.15)
+  via Iced's shader widget — the scaffold `prepare`/`draw` stubs are implemented.
+  The user ran `cargo run -p bongterm-app` and confirmed glyphs render on both the
+  baseline (iced-text) and the new wgpu path. The long-open "GUI visual unverified"
+  question is **answered ✅**. Renderer fidelity is intentionally minimal (no
+  colour/attrs, no cursor, fixed 80×24, full redraw per tick) — next increments.
 - Picked up orca `[next] = 1.exit` (Phase-1 exit gates). First found and fixed a
   **gate-numbering error**: orca's inline labels were off-by-one vs the canonical
   spec §6.1. The Phase-1 set is §6.1 **{1,4,5,6,7,8,17,28,29}** — #1 is *shell-
@@ -62,17 +70,19 @@ The remaining Phase-1 gates all need the real subsystems wired into `bongterm-ap
 which currently runs a single iced-`text` `TerminalSession` and consumes none of
 `render`/`mux`/`ledger`. Honest path:
 
-1. **Wire `bongterm-render::TerminalPipeline` into the app** (code; **human visual**)
-   — unblocks #4 (cold-start-to-first-frame), #5 full-app RSS + VRAM, #6 (idle CPU).
-   Also unblocks §6.1 **#2/#3** (renderer-perf gates that are in *no* phase's exit set
-   — see `docs/phase1-exit-gates.md`), and lets #5-RSS be re-measured for real.
-2. **Wire `bongterm-mux` panes into the app** (code; **human visual**) — #7.
-3. **Wire the ledger dashboard into the app** + build `CurrentProcessSampler::
+1. ✅ **DONE (`60755bb`): wire `bongterm-render::TerminalPipeline` into the app.**
+   Renderer fidelity increments remain (interactive, human visual): **colour/attrs**
+   (snapshot→renderer is codepoint-only today), **cursor**, **resize** (fixed 80×24),
+   **redraw-on-change** (full redraw every 33 ms tick now → likely a #6 idle-CPU
+   problem). Colour/attrs needs a richer render snapshot than `cells: Vec<u32>`.
+2. **Measure the renderer-dependent gates** (need GPU/display): #4 first-frame, #5
+   full-app RSS + VRAM, #6 idle CPU, and the orphaned §6.1 #2/#3 (keystroke-to-glyph
+   p99, throughput). Re-measure #5-RSS for real once the windowed app is sampled.
+3. **Wire `bongterm-mux` panes into the app** (code; **human visual**) — #7.
+4. **Wire the ledger dashboard into the app** + build `CurrentProcessSampler::
    register_pid` + per-pane process-tree attribution **as part of this wiring** (NOT
    in isolation — the per-pane PID→pane mapping contract is defined by how the app
    spawns shells into panes; building a flat `register_pid` first risks rework). — #17.
-4. **GUI visual verify** (human-only): `cargo run -p bongterm-app` — glyphs render,
-   typing visible, panes split, dashboard shows attribution.
 5. **Confirm CI for real**: fix the `master`-vs-`main` trigger mismatch on
    `ci.yml`/`nightly.yml`, then push/PR so they run on `windows-latest`.
 
