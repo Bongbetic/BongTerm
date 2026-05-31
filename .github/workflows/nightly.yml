@@ -1,0 +1,27 @@
+name: nightly
+on:
+  schedule:
+    # 07:00 UTC daily. Phase exit gates must be green for 7 consecutive runs.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+          components: rustfmt,clippy
+
+      # Phase 2 exit gates (spec §6.1 #15, #24). Phase 1 gates
+      # (#1,#4-8,#17,#28,#29) are wired into this job by Task 1.exit.
+      - name: Gate 15 — agent launch + transcript capture
+        run: cargo test -p bongterm-agents --test gate15
+      - name: Gate 24 — prompt-injection corpus
+        run: cargo run -p xtask -- prompt-injection-corpus
