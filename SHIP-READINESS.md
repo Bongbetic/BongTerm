@@ -4,9 +4,14 @@
 > Evidence-based ground-truth audit, not a status restatement. Where a claim is
 > inferred rather than directly verified, it is marked **[inferred]**.
 
-> **Update 3 (2026-05-31, later session — CI MADE GREEN):** `ci.yml` was red on
-> three gates at the start of this session and is now **fully green on all 7
-> steps** (stable 1.95). Landed on `master`: `ccef9ca` (restore the
+> **Update 3 (2026-05-31, later session — CI MADE GREEN LOCALLY):** `ci.yml` was
+> red on three gates at the start of this session and now **passes all 7 steps in
+> a local stable-1.95 reproduction** — but **CI itself has not run** (`ci.yml`
+> triggers on `push:[main]` + PRs; the branch is `master`). A `.gitattributes`
+> (`eol=lf`, `12db136`) closes the most likely local↔CI gap (Windows
+> `autocrlf=true` checkout → CRLF → rustfmt `newline_style="Unix"` failure); open
+> a PR / push to `main` to confirm for real. Landed on `master`: `ccef9ca`
+> (restore the
 > storage-sqlite repo-conformance coverage that an uncommitted change had deleted
 > to dodge `check-deps`, fixed properly via a one-line allow-list entry +
 > re-lock), `9c98f06` (stable rustfmt + ~38 behavior-preserving clippy

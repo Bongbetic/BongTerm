@@ -2,11 +2,17 @@
 
 ## TL;DR
 
-- **`ci.yml` is now fully green.** At session start three of its gates were red
-  (`cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets
-  --all-features -- -D warnings`, `cargo deny check`). All seven `ci.yml` steps
-  now pass on the CI-pinned **stable 1.95** toolchain. Four commits landed on
-  `master` (`ccef9ca`, `9c98f06`, `03b5678`, `41047c4`).
+- **All 7 `ci.yml` gates pass _locally_ on the CI-pinned stable 1.95 toolchain.**
+  At session start three were red (`cargo fmt --all -- --check`, `cargo clippy
+  --workspace --all-targets --all-features -- -D warnings`, `cargo deny check`).
+  **Caveat: CI itself has not run.** `ci.yml` triggers on `push:[main]` + PRs and
+  the working branch is `master`, so nothing has executed on GitHub's
+  `windows-latest`. A `.gitattributes` (`eol=lf`) was added to close the most
+  likely local↔CI divergence — Windows checkout (`core.autocrlf=true`) would
+  otherwise produce CRLF working trees and fail rustfmt's `newline_style="Unix"`
+  check. **To truly confirm green, open a PR or push to `main`.** Six commits
+  landed on `master` (`ccef9ca`, `9c98f06`, `03b5678`, `41047c4`, `1cda90c`,
+  `12db136`).
 - **The uncommitted storage-sqlite coverage regression is resolved properly**
   (not by deleting tests). The 3 repo-conformance tests are restored; the
   `check-deps` dep-direction violation is fixed with a one-line allow-list entry.
@@ -26,6 +32,8 @@
 | `9c98f06` | chore: make CI fmt + clippy gates green on stable 1.95. Stable rustfmt across all crates + ~38 clippy `-D warnings` lints resolved (behavior-preserving). |
 | `03b5678` | chore(deny): ignore `adler` unmaintained advisory (RUSTSEC-2025-0056) + allow `WTFPL` license — both transitive via vendored wezterm, no upgrade path. |
 | `41047c4` | docs: fix stale `Documents\Projects\BongT` paths (CLAUDE.md handoff rule, orca.md memory dir) after the move to `D:\Programming\Bongbetic\BongT`; align AGENTS.md with the local-`main` workflow. |
+| `1cda90c` | docs: record this CI-green session (this handoff + SHIP-READINESS Update 3 + orca status). |
+| `12db136` | build: add `.gitattributes` (`* text=auto eol=lf`) so the fmt gate survives Windows CI (`core.autocrlf=true` would otherwise check out CRLF and fail `newline_style="Unix"`). No content churn — all 201 tracked files already LF. |
 
 ## Verification (all run this session, stable 1.95, on `master` HEAD `41047c4`)
 
@@ -73,10 +81,15 @@
 
 ## What is green vs what remains
 
-- **`ci.yml`: fully green** (all 7 steps) — *but it triggers on `push:[main]` +
-  PRs, and the working branch is `master`*, so a push to `master` does not run
-  it. Either open a PR, push to `main`, or adjust the trigger to see it run in
-  GitHub. (Latent config gap, noted not fixed.)
+- **`ci.yml`: green locally on stable 1.95, NOT yet run on CI.** All 7 steps
+  pass in a local reproduction, but `ci.yml` triggers on `push:[main]` + PRs and
+  the working branch is `master`, so it has never executed on GitHub. Open a PR
+  or push to `main` to get a real CI result (the only thing that actually
+  confirms green). The line-ending divergence that most threatened the fmt gate
+  is now closed by `.gitattributes` (`12db136`); a residual risk is anything else
+  environmental (toolchain image, `cargo-deny` advisory-db drift over time).
+  (The `master`-vs-`main` trigger mismatch is a latent config gap — noted, not
+  fixed; decide whether to retarget the trigger or rename the branch.)
 - **`nightly.yml`: gates #15 + #24 green**, but the **Phase 1 exit gates
   (#1,#4-8,#17,#28,#29) are still not wired** — that is task **`1.exit`** and it
   is the real remaining Phase-1 work. Those perf gates (keystroke-to-glyph p99,
