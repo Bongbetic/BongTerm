@@ -1,6 +1,11 @@
 //! `BongTerm` application binary entrypoint.
+//!
+//! Repointed to the terminal slice (`terminal_app`): a window running a real
+//! shell. The richer `bongterm_ui` shell (tabs / palette / sidebar) is
+//! temporarily bypassed here and folded back in as a follow-up — see
+//! `SHIP-READINESS.md`.
 
-fn main() -> bongterm_ui::ShellResult {
+fn main() -> iced::Result {
     bongterm_diagnostics::install_panic_hook();
-    bongterm_ui::run_shell()
+    bongterm_app::terminal_app::run()
 }

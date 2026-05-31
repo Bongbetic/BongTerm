@@ -312,6 +312,7 @@ dependencies = [
  "bongterm-pty",
  "bongterm-term",
  "bongterm-ui",
+ "iced",
 ]
 
 [[package]]

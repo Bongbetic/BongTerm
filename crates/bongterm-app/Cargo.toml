@@ -12,3 +12,4 @@ bongterm-ui = { path = "../bongterm-ui" }
 bongterm-pty = { path = "../bongterm-pty" }
 bongterm-term = { path = "../bongterm-term" }
 anyhow = { workspace = true }
+iced = { workspace = true }

@@ -5,3 +5,4 @@
 //! stays presentation-only. See the module ownership matrix in `CLAUDE.md`.
 
 pub mod session;
+pub mod terminal_app;
