@@ -42,19 +42,54 @@
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-05-31, HEAD `60755bb`, tree clean)
+### Current status (2026-06-01, live-terminal slice advanced, tree clean)
 
-- **Real wgpu renderer wired into the app + visually confirmed** (commit `60755bb`): `bongterm-app` now renders the grid through `bongterm-render::TerminalPipeline` (cryoglyph) via Iced's shader widget, replacing the pragmatic iced-`text` grid. The renderer's `prepare`/`draw` (scaffold stubs) are implemented. The user ran `cargo run -p bongterm-app` and confirmed glyphs render on both the old (baseline) and new (wgpu) paths — the long-open "GUI visual unverified" question is now answered ✅.
-- Working tree clean; submodule `vendor/wezterm` clean at `5046fc22` (untracked `graphify-out/` inside it — ignore); stray untracked `.repograph/` at root (tool artifact).
-- `ci.yml` passes all 7 steps in a local stable-1.95 reproduction; not yet on GitHub CI (trigger mismatch below). `cargo test --workspace` = **350 pass / 0 fail**; fmt + clippy (`--workspace -D warnings`) clean.
-- `nightly.yml`: gates **#15, #24** (Phase 2) + **#1, #8, #28, #29** (Phase 1, full) + **#5-RSS** (Phase 1, *partial* headless tripwire) wired + green locally.
-- Full session record: `handoff.md`; ground-truth audit: `SHIP-READINESS.md`; gate triage: `docs/phase1-exit-gates.md`.
+Interactive session — the live terminal slice was driven forward in human-verified
+increments (`cargo run -p bongterm-app`, user confirmed each render). Commits
+`d90f0b6`→(resize) on `master`:
+
+- **Colour + attributes** (`e10f8eb`): real per-run fg/bg + bold/italic/underline
+  extracted from wezterm `Line::cluster` + palette; renderer draws per-span colour
+  via cosmic-text rich text. ✅ visually confirmed.
+- **Cursor** (`25436a3`): block glyph at the cursor cell in the layout stream
+  (aligns free; mid-line is a v1 gap). ✅ visually confirmed.
+- **Event-driven I/O** (`860b72b`): replaced the 33 ms poll timer with a
+  `Subscription::run_with` worker that owns the ConPTY + reader thread and emits
+  output only on real bytes; input/resize flow back via a `tokio` channel. Parser
+  stays app-side. ✅ confirmed working. Worker is **pane-keyed** → #7-ready.
+- **Window resize** (pending commit): `monospace_cell_size`/`grid_dims` map the
+  window to cols/rows; `Resized` reflows both the parser and the ConPTY. Terminal
+  now fills the window + reflows on drag. ✅ visually confirmed.
+- **CI trigger fixed** (`d90f0b6`): `ci.yml` now triggers on `master` (+ dispatch).
+  Still must push/PR to run on `windows-latest` — the 7-nightly clock can't start
+  until then (true long-pole).
+- **Gate #6 idle CPU**: measured (`35cbc94`) — ~0.05% all-core / ~0.6% single-core.
+  Passes all-core, fails single-core; event-driven improved but did not reach ~0
+  (floor = shell-driven repaints, suspected pwsh PSReadLine). Strict-pass needs
+  unchanged-grid repaint suppression — flagged, not done. **Not green.**
+- `cargo test --workspace` green; clippy `--workspace -D warnings` exit 0; fmt clean.
+- Full session record: `handoff.md`; gate triage + #6 data: `docs/phase1-exit-gates.md`.
 
 ### Next actionables (priority order)
 
-1. **Finish the live-terminal slice** (interactive — code + human visual). Renderer is wired ✅; remaining renderer fidelity: **colour/attributes** (snapshot→renderer is codepoint-only today), **cursor** rendering, **resize** (fixed 80×24 now), **dirty-region / redraw-on-change** (currently full redraw every 33 ms tick → a likely #6 idle-CPU problem). Then **`bongterm-mux` panes** → #7 and **`bongterm-ledger` dashboard + `register_pid`/process-tree attribution** → #17 (build register_pid *with* this wiring — its per-pane contract is integration-defined).
-2. **Measure the renderer-dependent gates** now that the real renderer runs: #4 cold-start-to-first-frame, #5 full-app RSS + VRAM (DXGI sampler), #6 idle CPU, and the orphaned #2/#3 (keystroke-to-glyph p99, throughput). Need a GPU/display; build harnesses, then re-measure #5-RSS for real.
-3. **Confirm CI for real** (config decision) — resolve the `master`-vs-`main` trigger mismatch (retarget `ci.yml`/`nightly.yml` triggers to `master`, or rename the branch), then push/PR so CI runs on `windows-latest`. Local green ≠ CI green.
+1. **Split panes → #7** (interactive). Foundation in place (pane-keyed worker +
+   resize + cell metrics). App holds N panes (adapter+snapshot+`WorkerCmd` sender
+   each) + `bongterm-mux::InMemoryMux` layout + active pane; one worker per pane via
+   `run_with((pane_id, shell))`; `Message` carries a pane id; `view` lays panes per
+   mux `Rect`; split-H/V + focus-next keybindings; per-pane cols/rows from rect ×
+   cell metrics. See `handoff.md` for the plan.
+2. **Resource dashboard → #17** (interactive). Worker now has `child.pid`; surface
+   it so `bongterm-ledger` samples the pane process tree. Build
+   `CurrentProcessSampler::register_pid` **with** this wiring (per-pane contract is
+   integration-defined). Then dashboard view-model + app panel.
+3. **#6 strict-pass**: suppress repaints when the visible grid is unchanged (cleanest
+   in the worker if wezterm `Terminal: Send`); + a `cmd.exe` idle measurement to
+   confirm the pwsh-animation hypothesis.
+4. **Measure the renderer-dependent gates** (need GPU/display): #4 cold-start, #5
+   full-app RSS + DXGI VRAM, #2/#3 keystroke-to-glyph p99 + throughput. Deferred bg
+   quad pass (cell backgrounds + reverse + quad cursor) rides on `monospace_cell_size`.
+5. **Confirm CI for real** — push/PR so `ci.yml` + `nightly.yml` run on
+   `windows-latest`. Local green ≠ CI green; the Phase-1 exit needs 7 green nightlies.
 
 ### Key known issues / deferred items
 

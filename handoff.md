@@ -1,106 +1,114 @@
-# BongTerm Handoff — `1.exit` measurable subset landed — 2026-05-31
+# BongTerm Handoff — live-terminal slice: colour, cursor, event-driven I/O, resize — 2026-06-01
 
 ## TL;DR
 
-- **LATE-SESSION (interactive): the real wgpu renderer is wired into the app and
-  visually confirmed** (commit `60755bb`). `bongterm-app` now renders the terminal
-  grid through `bongterm-render::TerminalPipeline` (cryoglyph / cosmic-text 0.15)
-  via Iced's shader widget — the scaffold `prepare`/`draw` stubs are implemented.
-  The user ran `cargo run -p bongterm-app` and confirmed glyphs render on both the
-  baseline (iced-text) and the new wgpu path. The long-open "GUI visual unverified"
-  question is **answered ✅**. Renderer fidelity is intentionally minimal (no
-  colour/attrs, no cursor, fixed 80×24, full redraw per tick) — next increments.
-- Picked up orca `[next] = 1.exit` (Phase-1 exit gates). First found and fixed a
-  **gate-numbering error**: orca's inline labels were off-by-one vs the canonical
-  spec §6.1. The Phase-1 set is §6.1 **{1,4,5,6,7,8,17,28,29}** — #1 is *shell-
-  profile launch* (not keystroke-to-glyph); #2/#3 (renderer perf) are deliberately
-  **excluded** from Phase 1. New `docs/phase1-exit-gates.md` triages all nine.
-- **Built + verified + wired + committed**: 4 gates **fully** (**#1** shell-smoke,
-  **#8** blocks, **#28** settings recovery, **#29** storage recovery) + **#5-RSS as a
-  PARTIAL headless engine-core lower-bound tripwire** (it does not spin up the
-  window/wgpu/render loop, so it does NOT verify the full-app 120 MB budget — do not
-  count it as #5 done). Commits `b81eaf0`→`2e0947e` on `master`.
-- **5 gates remain BLOCKED** on the same root cause — the real subsystems
-  (renderer / mux / ledger) are not wired into `bongterm-app`. These need a
-  GPU/display **and a human visual check**: #4 cold-start-to-first-frame,
-  #5-VRAM, #6 idle CPU, #7 split panes, #17 dashboard attribution. They were
-  **not faked green** (per the documented anti-gate-gaming discipline).
-- Post-session truth: `cargo test --workspace` = **350 pass / 0 fail / 1 ignored**;
-  `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets
-  --all-features -- -D warnings` clean. Verified by direct runs, not trusted.
+Interactive session (human at the keyboard running `cargo run -p bongterm-app`
+and reporting what rendered). Drove the **integration spine** — the
+SHIP-READINESS critical path — forward in verified increments. Every renderer
+change below was **visually confirmed by the user**, not committed blind.
 
-## Commits this session (on `master`, oldest→newest)
+Landed on `master` (oldest→newest):
 
-| Commit | Summary |
-|--------|---------|
-| `b81eaf0` | docs(orca): triage 1.exit gates; fix off-by-one gate labels (+ `docs/phase1-exit-gates.md`). |
-| `33add16` | feat(1.exit): gates **#1** shell-smoke + **#5-RSS** wired into `nightly.yml`. |
-| `e87beb5` | feat(1.exit): gates **#8** blocks (corpus + latency p99) + **#29** storage recovery. |
-| `2e0947e` | feat(1.exit): gate **#28** settings recovery — backup + Safe Mode + schema migration (real logic built in `bongterm-settings`). |
-| *(pending)* | docs: mark 1.exit measurable subset done in orca + triage + this handoff. |
+| Commit | What |
+|--------|------|
+| `d90f0b6` | ci: trigger `ci.yml` on `master` + `workflow_dispatch` (was `main`-only → CI had never run). |
+| `e10f8eb` | feat(render): real per-run **colour + attributes** in the live renderer (was codepoint-only grey). ✅ visually confirmed. |
+| `25436a3` | feat(render): draw the **cursor** as a block glyph in the cosmic-text stream (aligns free, no quad pass). ✅ visually confirmed. |
+| `35cbc94` | docs(1.exit): gate **#6** idle-CPU measured baseline + diagnosis. |
+| `860b72b` | feat(app): **event-driven ConPTY I/O** via a per-pane subscription worker (no idle timer). ✅ confirmed working. |
+| *(pending)* | feat: **window resize** → cell-metrics → cols/rows → ConPTY reflow. ✅ visually confirmed (fills window + reflows). |
 
-## Gate evidence (verified locally this session)
+Post-session truth (verify, don't trust): `cargo test --workspace` green;
+`cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0;
+`cargo fmt --all --check` clean.
 
-| Gate | Observable | Result |
-|---|---|---|
-| #1 | shell profiles launch (real ConPTY→`bongterm-term`→snapshot) | PASS 4/6: CMD, Windows PowerShell, PowerShell 7, SSH. SKIP-logged: Git Bash, WSL (no distro; `bash.exe` here is the WSL shim). CMD + WinPS are required so it can't pass vacuously. |
-| #5 (RSS, **PARTIAL**) | headless engine-core RSS lower-bound | **9.8 MB** via real `bongterm-ledger::CurrentProcessSampler` (`GetProcessMemoryInfo`), but **with no window/wgpu/render loop** — a floor on the engine, NOT the full-app 120 MB gate. Full #5 (RSS+VRAM) BLOCKED on the renderer. |
-| #8 | block-detection corpus + latency p99 ≤ 5 ms | fixture corpus green + **p99 500 ns** over 10k iters (real `parse_osc 133;D → BlockBuilder::push → confidence()`). |
-| #28 | settings load + validation-fail + backup + Safe Mode + migration | new logic in `bongterm-settings`; `settings_migration_and_last_known_good` drives all paths (backup read off disk + byte-compared; v1→v2 migration preserves user fields). |
-| #29 | SQLite + sidecar recovery: torn / checksum / corrupt-DB | `storage_recovery_suite` green; corrupt DB → `SqliteStore::open()` `Err "file is not a database"` (WAL pragma forces page-1 read), no panic, no fabrication. |
+## What changed, by subsystem
 
-CI steps added to `.github/workflows/nightly.yml` (one per gate, `--nocapture` so the
-measured numbers surface in CI logs).
+- **`bongterm-term`** (`adapter.rs`, `surface.rs`): `current_snapshot` now extracts
+  real per-run fg/bg colour + attrs via wezterm `Line::cluster` + palette
+  `resolve_fg/bg` (was hardcoded white/black/0). Added `surface::attr` bitfield and
+  `WezTermAdapter::resize`. Headless TDD: truecolor fg, bold+underline, start-col,
+  resize dims.
+- **`bongterm-render`** (`lib.rs`): `SurfaceSnapshot` is now `spans: Vec<CellSpan>`
+  + `cursor: CursorVis` (was `cells: Vec<u32>`). `prepare` builds a cosmic-text
+  **rich-text** stream with per-span fg colour + weight/slant, and injects a block
+  **cursor** glyph at the cursor cell (only at/after row content end — never shifts
+  text; mid-line cursor is a documented v1 gap). New `monospace_cell_size(font_size)`
+  (measures advance via a one-shot FontSystem, no GPU) and `grid_dims(...)` for
+  window→grid mapping. Tests for all.
+- **`bongterm-pty`** (`host.rs`): `PtyChild::resize(cols, rows)` (renamed `_master`
+  → `master`, now used).
+- **`bongterm-app`** (`terminal_app.rs`): **rewrote the I/O to event-driven.** A
+  `Subscription::run_with(shell, pane_worker)` worker owns the ConPTY child + a
+  blocking reader thread; emits `Message::Output` only when bytes arrive (idle =
+  no messages = no repaints). Keystrokes + resize flow back via a `tokio` channel
+  (`WorkerCmd::{Input,Resize}`) handed over in `Message::Ready`. The VT parser/grid
+  stays in app state (UI thread — need not be `Send`). Window `Resized` events map
+  to cols/rows via the cell metrics and reflow both the parser and the PTY.
+  `Cargo.toml`: added `tokio`.
 
-## Two real defects/notes surfaced (not yet actioned)
+## Gate #6 (idle CPU) — measured, NOT yet strict-pass
 
-1. **`bongterm-ledger` doc-vs-code lie:** `CurrentProcessSampler`'s doc comment claims
-   a `register_pid` method for child-PID attribution — **it does not exist**; the
-   sampler only measures the current process. This is exactly the missing capability
-   gate **#17** (dashboard attribution) needs. Fix the doc OR build the method — but
-   build it **as part of the #17 app wiring**, not in isolation: the per-pane
-   PID→pane mapping it must expose is defined by how the app spawns shells into
-   panes, so a flat standalone `register_pid` would likely be reshaped (rework).
-2. **rustfmt nightly drift** (pre-existing): `rustfmt.toml` declares nightly-only opts
-   ignored by the stable fmt gate — harmless now, latent. (Unchanged from prior handoff.)
+See `docs/phase1-exit-gates.md` for the full table. Bottom line: idle CPU is
+**~0.05% all-core / ~0.6% single-core** (60s, pwsh). **Passes under all-core
+normalization, fails under single-core.** The spec doesn't pin the normalization;
+the honest target is the strict (single-core ≈ 0) reading — do **not** claim #6
+green off the all-core number.
 
-## Next session — the integration wall (its own session + a human)
+- iced 0.14 is `ControlFlow::Wait` (event-driven), so it is NOT a framework spin.
+- Event-driven I/O **improved** the shipped baseline (0.83% → 0.57% single-core)
+  and removed output latency, but did not reach ~0. The residual floor is repaints
+  driven by the **shell's own periodic output** (suspected pwsh PSReadLine
+  animation; **confirm with a `cmd.exe` idle measurement** — cmd doesn't animate).
+- **Strict-pass path (follow-up):** suppress repaints when the visible grid is
+  unchanged. Cleanest place is the worker: move the parser into the worker, de-dup
+  snapshots, and only send when the grid changes (needs wezterm `Terminal: Send` —
+  verify). Alternatively throttle/coalesce. Flagged, not done.
 
-The remaining Phase-1 gates all need the real subsystems wired into `bongterm-app`,
-which currently runs a single iced-`text` `TerminalSession` and consumes none of
-`render`/`mux`/`ledger`. Honest path:
+## Next steps (priority order)
 
-1. ✅ **DONE (`60755bb`): wire `bongterm-render::TerminalPipeline` into the app.**
-   Renderer fidelity increments remain (interactive, human visual): **colour/attrs**
-   (snapshot→renderer is codepoint-only today), **cursor**, **resize** (fixed 80×24),
-   **redraw-on-change** (full redraw every 33 ms tick now → likely a #6 idle-CPU
-   problem). Colour/attrs needs a richer render snapshot than `cells: Vec<u32>`.
-2. **Measure the renderer-dependent gates** (need GPU/display): #4 first-frame, #5
-   full-app RSS + VRAM, #6 idle CPU, and the orphaned §6.1 #2/#3 (keystroke-to-glyph
-   p99, throughput). Re-measure #5-RSS for real once the windowed app is sampled.
-3. **Wire `bongterm-mux` panes into the app** (code; **human visual**) — #7.
-4. **Wire the ledger dashboard into the app** + build `CurrentProcessSampler::
-   register_pid` + per-pane process-tree attribution **as part of this wiring** (NOT
-   in isolation — the per-pane PID→pane mapping contract is defined by how the app
-   spawns shells into panes; building a flat `register_pid` first risks rework). — #17.
-5. **Confirm CI for real**: fix the `master`-vs-`main` trigger mismatch on
-   `ci.yml`/`nightly.yml`, then push/PR so they run on `windows-latest`.
+1. **Split panes — gate #7** (the user's stated next goal). Foundation is in place:
+   the PTY worker is already keyed for `run_with`, and resize/cell-metrics exist.
+   Plan: app state holds N panes (each: `WezTermAdapter` + snapshot + `WorkerCmd`
+   sender), a `bongterm-mux::InMemoryMux` for layout, `active_pane`. `subscription()`
+   returns one worker per pane keyed by `(pane_id, shell)`. `Message` gains a pane
+   id on `Ready`/`Output`. `view()` lays panes out per mux `Rect` (iced row/column
+   of shader widgets). Keybindings: split H/V, focus-next. Per-pane cols/rows from
+   the pane rect × cell metrics. **Interactive — verify each step in the GUI.**
+2. **Resource dashboard — gate #17.** The worker now has `child.pid`; surface it
+   (e.g. extend `Message::Ready` with the pid) so `bongterm-ledger` can sample the
+   pane's process tree. Build `CurrentProcessSampler::register_pid` **with** this
+   wiring (its per-pane PID→pane contract is integration-defined — don't build it
+   standalone). Then the dashboard view-model + a panel in the app.
+3. **#6 strict-pass** (repaint suppression, above) + the `cmd.exe` isolation
+   measurement to confirm the pwsh-animation hypothesis.
+4. **Background quad pass (deferred):** cell backgrounds + reverse-video + a
+   quad-based cursor. Gate-irrelevant; needs the advance-measured NDC overlay
+   (`monospace_cell_size` already gives the advance). Verify alignment at col 79.
+5. **#4 / #5-full / #2 / #3:** cold-start-to-first-frame, full-app RSS + DXGI VRAM,
+   keystroke-to-glyph p99, throughput — measurement harnesses (need display/GPU).
+6. **Confirm CI for real:** the trigger is fixed (`d90f0b6`); push / open a PR so
+   `ci.yml` + `nightly.yml` actually run on `windows-latest`. The 7-nightly clock
+   for the Phase-1 exit can't start until they do. **This is the true long-pole.**
 
-> **Shape note:** the renderer swap is high-risk done blind. Prefer an *interactive*
-> session — the agent writes the wiring, the user runs `cargo run -p bongterm-app`
-> and reports what renders — rather than committing rendering code no one has seen run.
+## Shape notes / discipline
 
-Do **not** mark #4/#5-VRAM/#6/#7/#17 green from a headless harness — they are only
-real with a display/GPU and a human looking at the window.
+- Renderer/GUI changes are **verified interactively** (human runs the app), never
+  committed blind. Keep this for panes/dashboard.
+- Do **not** fake-green the display/GPU gates (#4, #5-full, #6 strict, #7, #17) from
+  headless harnesses. They need a real window + a human.
+- "Finish" = `1.exit`→`6.exit` + 30-working-day dogfood + external beta + trademark.
+  Many sessions; calendar- and human-bound. This session advanced the spine; it did
+  not (and could not) finish the product.
 
 ## Key artifacts
 
 | Artifact | Path |
 |----------|------|
 | Task authority | `orca.md` |
-| Gate triage (this work) | `docs/phase1-exit-gates.md` |
+| Gate triage + #6 baseline | `docs/phase1-exit-gates.md` |
 | Ground-truth audit | `SHIP-READINESS.md` |
-| CI gates | `.github/workflows/ci.yml`, `.github/workflows/nightly.yml` |
 | Canonical gate criteria | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` §6.1 |
+| CI | `.github/workflows/ci.yml`, `nightly.yml` |
 
-*Generated 2026-05-31. All changes on `master`, not pushed. No sensitive data.*
+*Generated 2026-06-01. All changes on `master`, not pushed. No sensitive data.*
