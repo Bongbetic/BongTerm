@@ -60,10 +60,19 @@ green off the all-core number.
   and removed output latency, but did not reach ~0. The residual floor is repaints
   driven by the **shell's own periodic output** (suspected pwsh PSReadLine
   animation; **confirm with a `cmd.exe` idle measurement** — cmd doesn't animate).
-- **Strict-pass path (follow-up):** suppress repaints when the visible grid is
-  unchanged. Cleanest place is the worker: move the parser into the worker, de-dup
-  snapshots, and only send when the grid changes (needs wezterm `Terminal: Send` —
-  verify). Alternatively throttle/coalesce. Flagged, not done.
+- **MEASURE FIRST, then fix (do not reverse this):** run the `cmd.exe` idle
+  measurement **before** writing any #6 fix. cmd doesn't animate, so if cmd idles
+  ~0 the floor is shell-output repaints (→ repaint-suppression is the right fix);
+  if cmd is *also* ~0.6% single-core the floor is the reader thread not parking on
+  ConPTY (→ repaint-suppression fixes nothing; fix the reader instead). The
+  pwsh-animation cause is **suspected, not verified** — building the fix on the
+  guess repeats the #6 mistake (the event-driven 100 lines didn't reach ~0 because
+  the 2000 ms result already showed a floor). The app + the 60 s PowerShell sampler
+  are ready; one measurement decides.
+- **Strict-pass fix (only after the measurement):** if shell-output repaints —
+  suppress repaints when the visible grid is unchanged (cleanest in the worker:
+  move the parser there, de-dup snapshots, send only on grid change; needs wezterm
+  `Terminal: Send` — verify). If reader-thread spin — make the ConPTY read block.
 
 ## Next steps (priority order)
 
@@ -75,13 +84,20 @@ green off the all-core number.
    id on `Ready`/`Output`. `view()` lays panes out per mux `Rect` (iced row/column
    of shader widgets). Keybindings: split H/V, focus-next. Per-pane cols/rows from
    the pane rect × cell metrics. **Interactive — verify each step in the GUI.**
+   Heads-up: the first step is an all-or-nothing single→N restructure of
+   boot/update/view/subscription/Message — no sub-slice of it compiles-and-runs,
+   so it wants a fresh context budget. Also: a pane whose shell **exits** currently
+   just freezes its last snapshot (fine for single-pane v1); multi-pane needs
+   dead-pane handling (e.g. a "pane exited" banner + close/restart).
 2. **Resource dashboard — gate #17.** The worker now has `child.pid`; surface it
    (e.g. extend `Message::Ready` with the pid) so `bongterm-ledger` can sample the
    pane's process tree. Build `CurrentProcessSampler::register_pid` **with** this
    wiring (its per-pane PID→pane contract is integration-defined — don't build it
    standalone). Then the dashboard view-model + a panel in the app.
-3. **#6 strict-pass** (repaint suppression, above) + the `cmd.exe` isolation
-   measurement to confirm the pwsh-animation hypothesis.
+3. **#6 strict-pass** — run the `cmd.exe` isolation measurement **first** (it
+   decides whether the fix is repaint-suppression or a reader-thread fix; see
+   §"Gate #6"), then apply the indicated fix. Do not build the fix on the
+   unverified pwsh-animation guess.
 4. **Background quad pass (deferred):** cell backgrounds + reverse-video + a
    quad-based cursor. Gate-irrelevant; needs the advance-measured NDC overlay
    (`monospace_cell_size` already gives the advance). Verify alignment at col 79.
