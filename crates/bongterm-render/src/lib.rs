@@ -425,6 +425,60 @@ const fn unpack_rgb(c: u32) -> (u8, u8, u8) {
     )
 }
 
+/// Measure the monospace cell size `(advance_width, line_height)` in **logical**
+/// pixels for the renderer's font at `font_size`.
+///
+/// `bongterm-app` uses this to map a window's logical size to terminal
+/// columns/rows (the renderer lays text out with this same font/metrics, so the
+/// grid lines up). Creates a one-shot `cosmic-text` `FontSystem` (loads system
+/// fonts — tens of ms), so callers should cache the result, not call per frame.
+/// No GPU is required.
+#[must_use]
+pub fn monospace_cell_size(font_size: f32) -> (f32, f32) {
+    const PROBE: &str = "MMMMMMMMMMMMMMMMMMMM"; // 20 monospace cells
+    const PROBE_CELLS: f32 = 20.0;
+
+    // Must match `TerminalPrimitive::prepare`: line height = font_size * 1.25.
+    let line_height = font_size * 1.25;
+    let mut font_system = cryoglyph::FontSystem::new();
+    let mut buffer = cryoglyph::Buffer::new(
+        &mut font_system,
+        cryoglyph::Metrics::new(font_size, line_height),
+    );
+    buffer.set_size(&mut font_system, Some(10_000.0), Some(line_height * 2.0));
+    let attrs = cryoglyph::Attrs::new().family(cryoglyph::Family::Monospace);
+    buffer.set_text(
+        &mut font_system,
+        PROBE,
+        &attrs,
+        cryoglyph::Shaping::Advanced,
+        None,
+    );
+    buffer.shape_until_scroll(&mut font_system, false);
+
+    // Advance = laid-out width of the probe / cell count. Fall back to a typical
+    // monospace ratio if the probe somehow produces no layout run.
+    let cell_w = buffer
+        .layout_runs()
+        .next()
+        .map_or(font_size * 0.6, |run| run.line_w / PROBE_CELLS);
+    (cell_w, line_height)
+}
+
+/// Compute terminal grid dimensions `(cols, rows)` that fit a content area of
+/// `width` × `height` **logical** pixels, given a cell size from
+/// [`monospace_cell_size`]. Always returns at least `1×1`.
+#[must_use]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub fn grid_dims(width: f32, height: f32, cell_w: f32, cell_h: f32) -> (u16, u16) {
+    let cols = (width / cell_w).floor().max(1.0);
+    let rows = (height / cell_h).floor().max(1.0);
+    (
+        cols.min(f32::from(u16::MAX)) as u16,
+        rows.min(f32::from(u16::MAX)) as u16,
+    )
+}
+
 impl iced::widget::shader::Primitive for TerminalPrimitive {
     type Pipeline = TerminalPipeline;
 
@@ -1100,5 +1154,28 @@ mod tests {
     fn span_foreground_colour_round_trips_to_unpack() {
         // Guards the fg packing/unpacking the renderer relies on for span colour.
         assert_eq!(unpack_rgb(0x00AB_CDEF), (0xAB, 0xCD, 0xEF));
+    }
+
+    // --- 1.C.x: cell metrics + grid dimensions (resize / panes) ---
+
+    #[test]
+    fn monospace_cell_size_is_plausible() {
+        let (w, h) = monospace_cell_size(14.0);
+        assert!(
+            (h - 17.5).abs() < 0.001,
+            "line height should be font_size*1.25"
+        );
+        assert!(
+            w > 3.0 && w < 20.0,
+            "advance for 14px monospace out of range: {w}"
+        );
+    }
+
+    #[test]
+    fn grid_dims_floors_and_clamps_to_one() {
+        // 800x600 content with ~8x17.5 cells => 100 cols x 34 rows.
+        assert_eq!(grid_dims(800.0, 600.0, 8.0, 17.5), (100, 34));
+        // A sub-cell area still yields a usable 1x1 grid.
+        assert_eq!(grid_dims(2.0, 2.0, 8.0, 17.5), (1, 1));
     }
 }

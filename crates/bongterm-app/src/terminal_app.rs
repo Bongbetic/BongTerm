@@ -21,9 +21,13 @@ use iced::keyboard::{self, Key, key::Named};
 use iced::widget::container;
 use iced::{Element, Length, Subscription, Task, Theme};
 
-/// Initial terminal geometry (v1 fixes the size; resize is deferred to #7).
+/// Initial terminal geometry, used until the first window-resize event arrives.
 const COLS: u16 = 80;
 const ROWS: u16 = 24;
+/// Font size (logical px) — must match `bongterm-render`'s `prepare`.
+const FONT_SIZE: f32 = 14.0;
+/// Container padding (logical px, per side) applied in `view`.
+const PADDING: f32 = 8.0;
 
 pub struct TerminalApp {
     /// VT parser + grid. Fed by `Message::Output`; lives on the UI thread, so it
@@ -31,18 +35,35 @@ pub struct TerminalApp {
     adapter: WezTermAdapter,
     /// Latest render snapshot for `view` (already converted from the term grid).
     snapshot: bongterm_render::SurfaceSnapshot,
-    /// Channel to the PTY worker for keystrokes; arrives via `Message::Ready`.
-    input: Option<tokio::sync::mpsc::Sender<Vec<u8>>>,
+    /// Channel to the PTY worker for input + resize; arrives via `Message::Ready`.
+    input: Option<tokio::sync::mpsc::Sender<WorkerCmd>>,
+    /// Cached cell size (logical px) for mapping window size → cols/rows.
+    cell_w: f32,
+    cell_h: f32,
+    /// Current grid dimensions; guards against redundant resizes.
+    cols: u16,
+    rows: u16,
+}
+
+/// A command from the app to a pane's PTY worker.
+#[derive(Debug, Clone)]
+pub enum WorkerCmd {
+    /// Bytes to write to the child (a keystroke).
+    Input(Vec<u8>),
+    /// New terminal dimensions (after a window resize).
+    Resize { cols: u16, rows: u16 },
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// The worker is live; carries the channel that delivers keystrokes to the PTY.
-    Ready(tokio::sync::mpsc::Sender<Vec<u8>>),
+    /// The worker is live; carries the channel for input + resize commands.
+    Ready(tokio::sync::mpsc::Sender<WorkerCmd>),
     /// Raw bytes read from the ConPTY child.
     Output(Vec<u8>),
     /// Bytes to write to the child (mapped from a keystroke).
     Input(Vec<u8>),
+    /// Window resized to the given logical `(width, height)`.
+    Resized(f32, f32),
 }
 
 impl TerminalApp {
@@ -51,6 +72,7 @@ impl TerminalApp {
     pub fn boot() -> (Self, Task<Message>) {
         // The parser/grid starts empty; the worker (subscription) spawns the PTY
         // and the first prompt arrives as a `Message::Output`.
+        let (cell_w, cell_h) = bongterm_render::monospace_cell_size(FONT_SIZE);
         let mut adapter = WezTermAdapter::new(u32::from(COLS), u32::from(ROWS));
         let snapshot = to_render_snapshot(&adapter.current_snapshot());
         (
@@ -58,6 +80,10 @@ impl TerminalApp {
                 adapter,
                 snapshot,
                 input: None,
+                cell_w,
+                cell_h,
+                cols: COLS,
+                rows: ROWS,
             },
             Task::none(),
         )
@@ -74,7 +100,24 @@ impl TerminalApp {
                 if let Some(tx) = &self.input {
                     // Keystrokes are tiny and infrequent; on the rare full-buffer
                     // case drop rather than block the UI thread.
-                    let _ = tx.try_send(bytes);
+                    let _ = tx.try_send(WorkerCmd::Input(bytes));
+                }
+            }
+            Message::Resized(width, height) => {
+                // Map the window's content area (minus padding) to a cell grid and,
+                // if it changed, reflow both the local parser and the child PTY.
+                let content_w = (width - 2.0 * PADDING).max(1.0);
+                let content_h = (height - 2.0 * PADDING).max(1.0);
+                let (cols, rows) =
+                    bongterm_render::grid_dims(content_w, content_h, self.cell_w, self.cell_h);
+                if cols != self.cols || rows != self.rows {
+                    self.cols = cols;
+                    self.rows = rows;
+                    self.adapter.resize(u32::from(cols), u32::from(rows));
+                    self.snapshot = to_render_snapshot(&self.adapter.current_snapshot());
+                    if let Some(tx) = &self.input {
+                        let _ = tx.try_send(WorkerCmd::Resize { cols, rows });
+                    }
                 }
             }
         }
@@ -84,20 +127,19 @@ impl TerminalApp {
     pub fn subscription(&self) -> Subscription<Message> {
         // Event-driven PTY worker (no idle timer) + raw keyboard events.
         let worker = Subscription::run_with(default_shell(), pane_worker);
-        let keys = event::listen_raw(|raw, _status, _window| {
-            if let Event::Keyboard(keyboard::Event::KeyPressed {
+        let events = event::listen_raw(|raw, _status, _window| match raw {
+            Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
                 text,
                 modifiers,
                 ..
-            }) = raw
-            {
-                key_to_bytes(&key, text.as_deref(), modifiers).map(Message::Input)
-            } else {
-                None
+            }) => key_to_bytes(&key, text.as_deref(), modifiers).map(Message::Input),
+            Event::Window(iced::window::Event::Resized(size)) => {
+                Some(Message::Resized(size.width, size.height))
             }
+            _ => None,
         });
-        Subscription::batch([worker, keys])
+        Subscription::batch([worker, events])
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -164,8 +206,8 @@ fn pane_worker(shell: &String) -> impl Stream<Item = Message> + use<> {
                 return;
             };
 
-            // App -> worker: keystrokes.
-            let (input_tx, mut input_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+            // App -> worker: input + resize commands.
+            let (input_tx, mut input_rx) = tokio::sync::mpsc::channel::<WorkerCmd>(64);
             if output.send(Message::Ready(input_tx)).await.is_err() {
                 return; // app gone
             }
@@ -201,10 +243,16 @@ fn pane_worker(shell: &String) -> impl Stream<Item = Message> + use<> {
                         None => break, // child closed / reader ended
                     },
                     maybe = input_rx.recv() => {
-                        if let Some(bytes) = maybe {
-                            use std::io::Write;
-                            let _ = child.writer.write_all(&bytes);
-                            let _ = child.writer.flush();
+                        match maybe {
+                            Some(WorkerCmd::Input(bytes)) => {
+                                use std::io::Write;
+                                let _ = child.writer.write_all(&bytes);
+                                let _ = child.writer.flush();
+                            }
+                            Some(WorkerCmd::Resize { cols, rows }) => {
+                                let _ = child.resize(cols, rows);
+                            }
+                            None => break, // app dropped the command channel
                         }
                     }
                 }

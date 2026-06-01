@@ -78,6 +78,28 @@ impl WezTermAdapter {
         std::mem::take(&mut self.dirty)
     }
 
+    /// Resize the terminal grid to `cols`×`rows`. The backing emulator reflows
+    /// its screen; subsequent snapshots report the new dimensions. Marks the
+    /// whole surface dirty.
+    pub fn resize(&mut self, cols: u32, rows: u32) {
+        self.cols = cols;
+        self.rows = rows;
+        self.terminal.resize(wezterm_term::TerminalSize {
+            rows: rows as usize,
+            cols: cols as usize,
+            pixel_width: 0,
+            pixel_height: 0,
+            dpi: 0,
+        });
+        self.dirty.push(DirtyRegion {
+            start: CellPosition { row: 0, col: 0 },
+            end_inclusive: CellPosition {
+                row: rows.saturating_sub(1),
+                col: cols.saturating_sub(1),
+            },
+        });
+    }
+
     pub fn current_snapshot(&mut self) -> SurfaceSnapshot {
         self.seq += 1;
 
@@ -261,6 +283,15 @@ mod tests {
             0,
             "underline bit should be set"
         );
+    }
+
+    #[test]
+    fn resize_changes_snapshot_dimensions() {
+        let mut a = WezTermAdapter::new(80, 24);
+        a.resize(100, 30);
+        let snap = a.current_snapshot();
+        assert_eq!(snap.cols, 100);
+        assert_eq!(snap.rows, 30);
     }
 
     #[test]
