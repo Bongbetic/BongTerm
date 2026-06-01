@@ -1,38 +1,46 @@
-//! Thin iced shell over the proven [`TerminalSession`] core.
+//! Thin iced shell over an event-driven ConPTY worker.
 //!
-//! Architecture (see the slice notes in `SHIP-READINESS.md`): a background
-//! thread reads ConPTY bytes into an mpsc channel; an `iced::time::every` tick
-//! drains the channel into the session (parser) and refreshes the snapshot;
-//! keystrokes are mapped to bytes and written back. The session lives in the
-//! iced state (single-threaded), so it needs no `Send`. Rendering is a pragmatic
-//! monospace text grid; the wgpu `TerminalPipeline` can swap in behind the same
-//! `SurfaceSnapshot` boundary later.
+//! Architecture: a per-pane `Subscription` worker (see [`pane_worker`]) owns the
+//! ConPTY child and a blocking reader thread, and emits `Message::Output` *only*
+//! when bytes actually arrive — so an idle shell produces no messages, no
+//! repaints, and ~zero idle CPU (gate #6, vs the previous unconditional 33 ms
+//! tick). Keystrokes flow the other way through a `tokio` channel handed to the
+//! app via `Message::Ready`. The VT parser/grid (`bongterm-term`) lives in the
+//! app state (it need not be `Send`); the renderer draws the latest snapshot via
+//! Iced's wgpu shader widget.
+//!
+//! The worker is keyed by shell via `Subscription::run_with`, so Phase-1 #7
+//! (split panes) becomes "instantiate one worker per pane id + route input",
+//! not a rewrite.
 
-use std::sync::mpsc::{Receiver, channel};
-
-use bongterm_term::SurfaceSnapshot;
+use bongterm_pty::{ChildSpec, PortablePtyHost, PtyHost};
+use bongterm_term::WezTermAdapter;
 use iced::event::{self, Event};
+use iced::futures::{SinkExt, Stream};
 use iced::keyboard::{self, Key, key::Named};
-use iced::time::{self, Duration};
 use iced::widget::container;
 use iced::{Element, Length, Subscription, Task, Theme};
 
-use crate::session::TerminalSession;
-
-/// Initial terminal geometry (v1 fixes the size; resize is deferred).
+/// Initial terminal geometry (v1 fixes the size; resize is deferred to #7).
 const COLS: u16 = 80;
 const ROWS: u16 = 24;
 
 pub struct TerminalApp {
-    session: TerminalSession,
-    output_rx: Receiver<Vec<u8>>,
-    snapshot: SurfaceSnapshot,
+    /// VT parser + grid. Fed by `Message::Output`; lives on the UI thread, so it
+    /// need not be `Send` (the PTY I/O that does cross threads lives in the worker).
+    adapter: WezTermAdapter,
+    /// Latest render snapshot for `view` (already converted from the term grid).
+    snapshot: bongterm_render::SurfaceSnapshot,
+    /// Channel to the PTY worker for keystrokes; arrives via `Message::Ready`.
+    input: Option<tokio::sync::mpsc::Sender<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Periodic tick: drain pending ConPTY output and refresh the snapshot.
-    Tick,
+    /// The worker is live; carries the channel that delivers keystrokes to the PTY.
+    Ready(tokio::sync::mpsc::Sender<Vec<u8>>),
+    /// Raw bytes read from the ConPTY child.
+    Output(Vec<u8>),
     /// Bytes to write to the child (mapped from a keystroke).
     Input(Vec<u8>),
 }
@@ -41,34 +49,15 @@ impl TerminalApp {
     // No explicit #[must_use]: the returned Task is already #[must_use], so the
     // tuple carries that obligation without a redundant (message-less) attribute.
     pub fn boot() -> (Self, Task<Message>) {
-        let shell = default_shell();
-        let (mut session, reader) = TerminalSession::spawn_command(&shell, &[], COLS, ROWS)
-            .unwrap_or_else(|e| panic!("failed to spawn shell {shell:?}: {e:#}"));
-
-        // Background reader: blocking ConPTY reads → channel. The thread exits
-        // when the master closes (app shutdown) or the pipe breaks.
-        let (tx, output_rx) = channel::<Vec<u8>>();
-        std::thread::spawn(move || {
-            let mut reader = reader;
-            let mut buf = [0u8; 8192];
-            loop {
-                match std::io::Read::read(&mut reader, &mut buf) {
-                    Ok(0) | Err(_) => break,
-                    Ok(n) => {
-                        if tx.send(buf[..n].to_vec()).is_err() {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        let snapshot = session.snapshot();
+        // The parser/grid starts empty; the worker (subscription) spawns the PTY
+        // and the first prompt arrives as a `Message::Output`.
+        let mut adapter = WezTermAdapter::new(u32::from(COLS), u32::from(ROWS));
+        let snapshot = to_render_snapshot(&adapter.current_snapshot());
         (
             Self {
-                session,
-                output_rx,
+                adapter,
                 snapshot,
+                input: None,
             },
             Task::none(),
         )
@@ -76,25 +65,25 @@ impl TerminalApp {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Tick => {
-                let mut changed = false;
-                while let Ok(bytes) = self.output_rx.try_recv() {
-                    self.session.feed(&bytes);
-                    changed = true;
-                }
-                if changed {
-                    self.snapshot = self.session.snapshot();
-                }
+            Message::Ready(input) => self.input = Some(input),
+            Message::Output(bytes) => {
+                self.adapter.ingest_bytes(&bytes);
+                self.snapshot = to_render_snapshot(&self.adapter.current_snapshot());
             }
             Message::Input(bytes) => {
-                let _ = self.session.write_input(&bytes);
+                if let Some(tx) = &self.input {
+                    // Keystrokes are tiny and infrequent; on the rare full-buffer
+                    // case drop rather than block the UI thread.
+                    let _ = tx.try_send(bytes);
+                }
             }
         }
         Task::none()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        let ticks = time::every(Duration::from_millis(33)).map(|_| Message::Tick);
+        // Event-driven PTY worker (no idle timer) + raw keyboard events.
+        let worker = Subscription::run_with(default_shell(), pane_worker);
         let keys = event::listen_raw(|raw, _status, _window| {
             if let Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
@@ -108,15 +97,14 @@ impl TerminalApp {
                 None
             }
         });
-        Subscription::batch([ticks, keys])
+        Subscription::batch([worker, keys])
     }
 
     pub fn view(&self) -> Element<'_, Message> {
         // Render the grid through the real wgpu/cryoglyph renderer
-        // (`bongterm-render`) via Iced's shader widget, replacing the previous
-        // pragmatic iced-`text` grid.
+        // (`bongterm-render`) via Iced's shader widget.
         let program = TerminalProgram {
-            snapshot: to_render_snapshot(&self.snapshot),
+            snapshot: self.snapshot.clone(),
         };
         container(
             iced::widget::shader::Shader::new(program)
@@ -138,6 +126,91 @@ impl TerminalApp {
     pub fn title(&self) -> String {
         "BongTerm".to_string()
     }
+}
+
+/// The event-driven PTY worker for one pane.
+///
+/// Owns the ConPTY child (kept alive for the worker's lifetime) plus a blocking
+/// reader thread. Emits `Message::Ready` once (handing back the keystroke
+/// channel), then `Message::Output` whenever the child produces bytes. An idle
+/// child blocks the reader thread and parks this future — no wakeups, no frames.
+///
+/// Keyed by shell string so `run_with` gives a stable identity; #7 will key by
+/// pane id and instantiate one worker per pane.
+// `&String` is required by `Subscription::run_with`'s `fn(&D)` builder shape.
+#[allow(clippy::ptr_arg)]
+fn pane_worker(shell: &String) -> impl Stream<Item = Message> + use<> {
+    let shell = shell.clone();
+    iced::stream::channel(
+        100,
+        move |mut output: iced::futures::channel::mpsc::Sender<Message>| async move {
+            let spec = ChildSpec {
+                command: shell.into(),
+                args: Vec::new(),
+                cwd: None,
+                env: Vec::new(),
+                cols: COLS,
+                rows: ROWS,
+            };
+            let mut child = match PortablePtyHost.spawn(spec) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("bongterm-app: PTY spawn failed: {e:#}");
+                    return;
+                }
+            };
+            let Some(mut reader) = child.take_reader() else {
+                eprintln!("bongterm-app: PTY reader already taken");
+                return;
+            };
+
+            // App -> worker: keystrokes.
+            let (input_tx, mut input_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+            if output.send(Message::Ready(input_tx)).await.is_err() {
+                return; // app gone
+            }
+
+            // Blocking reader thread -> async byte channel. Bounded, so a slow
+            // consumer applies backpressure to the reader (and thus to ConPTY) rather
+            // than growing an unbounded queue.
+            let (byte_tx, mut byte_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+            std::thread::spawn(move || {
+                let mut buf = [0u8; 8192];
+                loop {
+                    match std::io::Read::read(&mut reader, &mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            if byte_tx.blocking_send(buf[..n].to_vec()).is_err() {
+                                break; // worker gone
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Forward output as it arrives; write input as it arrives. Both `recv`s
+            // are cancel-safe, so `select!` cannot lose a message.
+            loop {
+                tokio::select! {
+                    maybe = byte_rx.recv() => match maybe {
+                        Some(bytes) => {
+                            if output.send(Message::Output(bytes)).await.is_err() {
+                                break; // app gone
+                            }
+                        }
+                        None => break, // child closed / reader ended
+                    },
+                    maybe = input_rx.recv() => {
+                        if let Some(bytes) = maybe {
+                            use std::io::Write;
+                            let _ = child.writer.write_all(&bytes);
+                            let _ = child.writer.flush();
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
 
 /// Pick the default shell: `pwsh.exe` if present, else `cmd.exe`.
@@ -182,7 +255,7 @@ impl iced::widget::shader::Program<Message> for TerminalProgram {
 /// (reused as the renderer's `SnapshotId`, for later change detection) carry
 /// through too. Grid dims are window-bounded, so the `u32`→`u16` conversions
 /// never actually saturate.
-fn to_render_snapshot(term: &SurfaceSnapshot) -> bongterm_render::SurfaceSnapshot {
+fn to_render_snapshot(term: &bongterm_term::SurfaceSnapshot) -> bongterm_render::SurfaceSnapshot {
     let spans = term
         .runs
         .iter()

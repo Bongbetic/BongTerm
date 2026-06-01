@@ -14,6 +14,10 @@ bongterm-term = { path = "../bongterm-term" }
 bongterm-render = { path = "../bongterm-render" }
 anyhow = { workspace = true }
 iced = { workspace = true }
+# Event-driven PTY worker: blocking reader thread -> async bridge (blocking_send)
+# + select! over output/input. iced already runs on a tokio runtime (its "tokio"
+# feature); this declares the direct dependency the worker uses.
+tokio = { workspace = true }
 
 [dev-dependencies]
 # Gate #5 (RSS): exercise the real resource sampler against a live session.
