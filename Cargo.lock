@@ -315,6 +315,7 @@ dependencies = [
  "bongterm-term",
  "bongterm-ui",
  "iced",
+ "tokio",
 ]
 
 [[package]]
