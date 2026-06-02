@@ -103,6 +103,57 @@ pub fn scan_file_locations(line: &str) -> Vec<FileSpan> {
     spans
 }
 
+/// A read-only reference to one rendered line.
+#[derive(Debug, Clone)]
+pub struct LineRef {
+    pub row: usize,
+    pub text: String,
+}
+
+/// A clickable file-location span anchored to a viewport row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OverlaySpan {
+    pub row: usize,
+    pub file: FileSpan,
+}
+
+/// Clickable spans for a viewport, separate from scrollback text.
+#[derive(Debug, Clone, Default)]
+pub struct ClickableOverlay {
+    spans: Vec<OverlaySpan>,
+}
+
+impl ClickableOverlay {
+    /// Build overlay spans from rendered line refs.
+    #[must_use]
+    pub fn build(lines: &[LineRef]) -> Self {
+        let spans = lines
+            .iter()
+            .flat_map(|line| {
+                scan_file_locations(&line.text)
+                    .into_iter()
+                    .map(|file| OverlaySpan {
+                        row: line.row,
+                        file,
+                    })
+            })
+            .collect();
+        Self { spans }
+    }
+
+    /// Clickable spans on one row.
+    #[must_use]
+    pub fn spans_for_row(&self, row: usize) -> Vec<&OverlaySpan> {
+        self.spans.iter().filter(|span| span.row == row).collect()
+    }
+
+    /// All clickable spans in viewport order.
+    #[must_use]
+    pub fn all(&self) -> &[OverlaySpan] {
+        &self.spans
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,6 +202,32 @@ mod tests {
         assert_eq!(spans[0].path, r"C:\proj\Program.cs");
         assert_eq!(spans[0].line, Some(55));
         assert_eq!(spans[0].kind, PatternKind::DotNetStack);
+    }
+
+    #[test]
+    fn overlay_collects_spans_per_line_without_mutating_text() {
+        let lines = vec![
+            LineRef {
+                row: 0,
+                text: "ok no match here".to_string(),
+            },
+            LineRef {
+                row: 1,
+                text: "error src/main.rs:10:4".to_string(),
+            },
+            LineRef {
+                row: 2,
+                text: r#"File "x.py", line 3"#.to_string(),
+            },
+        ];
+        let overlay = ClickableOverlay::build(&lines);
+        assert_eq!(overlay.spans_for_row(0).len(), 0);
+        assert_eq!(overlay.spans_for_row(1).len(), 1);
+        assert_eq!(overlay.spans_for_row(2).len(), 1);
+        assert_eq!(lines[1].text, "error src/main.rs:10:4");
+        let span = &overlay.spans_for_row(1)[0];
+        assert_eq!(span.row, 1);
+        assert_eq!(span.file.path, "src/main.rs");
     }
 
     #[test]

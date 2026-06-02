@@ -3,4 +3,6 @@
 pub const MODULE_NAME: &str = "patterns";
 
 pub mod matchers;
-pub use matchers::{FileSpan, PatternKind, scan_file_locations};
+pub use matchers::{
+    ClickableOverlay, FileSpan, LineRef, OverlaySpan, PatternKind, scan_file_locations,
+};

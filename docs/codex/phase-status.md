@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.E.1 complete** — file:line pattern matchers.
+Current focus: **Phase 3 task 3.E.2 complete** — clickable overlay spans.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -27,3 +27,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.D.2 | Complete | RED: `cargo test -p bongterm-devassist jobs::runner` failed with unresolved `JobOutcome` and `JobRunner`. GREEN: `cargo test -p bongterm-devassist jobs::runner` (pass, 6 tests); `cargo test -p bongterm-devassist` (pass, 37 tests) | Added pure `JobRunner::finish` mapping exit/spawn/cancel outcomes to terminal `JobState` and emitting completion/failure/cancel toasts through `Notifier`. | 3.D.3 |
 | 3.D.3 | Complete | RED: `cargo test -p bongterm-devassist jobs::list` failed with unresolved `JobList`. GREEN: `cargo test -p bongterm-devassist jobs::list` (pass, 3 tests); `cargo test -p bongterm-devassist` (pass, 40 tests) | Added `JobList` panel view-model with registration-order snapshots, state update by `JobId`, and active-count excluding terminal jobs. | 3.E.1 |
 | 3.E.1 | Complete | RED: `cargo test -p bongterm-devassist patterns::matchers` failed with unresolved `scan_file_locations` and `PatternKind`. GREEN: `cargo test -p bongterm-devassist patterns::matchers` (pass, 6 tests); `cargo test -p bongterm-devassist` (pass, 46 tests) | Added file:line matchers for TS/Rust/Node/Python/.NET, byte overlay ranges, overlap suppression, and time-of-day false-positive guard. | 3.E.2 |
+| 3.E.2 | Complete | RED: plan command `cargo test -p bongterm-devassist patterns::matchers overlay` was invalid on current Cargo; valid filter `cargo test -p bongterm-devassist overlay` failed with unresolved `LineRef` and `ClickableOverlay`. GREEN: `cargo test -p bongterm-devassist overlay` (pass, 1 test); `cargo test -p bongterm-devassist patterns::matchers` (pass, 7 tests); `cargo test -p bongterm-devassist` (pass, 47 tests) | Added read-only `LineRef`, `OverlaySpan`, and `ClickableOverlay` that collect per-row spans without mutating line text. | 3.E.3 |
