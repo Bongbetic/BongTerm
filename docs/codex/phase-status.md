@@ -6,13 +6,17 @@ Source of truth:
 - Product intent: `docs/PRD/bongterm_prd_v7.md`
 - Execution control plane: `orca.md`
 
-Current focus: **Phase 5 local implementation complete** on 2026-06-03.
+Current focus: **Phase 5 local implementation complete and committed** on 2026-06-03.
+
+Commit: `d221e06 feat(phase5): close hardening release prep`
+
+Branch: `codex/phase5-hardening-closeout`
 
 Phase 1 exit closure: local gates #1,#4-8,#17,#28,#29 are green. The remaining Phase 1 exit proof is the required 7 consecutive remote nightlies.
 
 Phase 2 exit closure: local gates #15 and #24 are green and wired into nightly. The remaining Phase 2 exit proof is the required 7 consecutive remote nightlies.
 
-Phase 5 exit closure: local code/doc/tooling gates are green. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing toolchain/cert.
+Phase 5 exit closure: local code/doc/tooling gates are green and committed. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing toolchain/cert.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
@@ -26,4 +30,4 @@ Phase 5 exit closure: local code/doc/tooling gates are green. The remaining Phas
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
 | Workspace gates | Green | `cargo fmt --all -- --check` (pass); `cargo clippy --all-targets --all-features --workspace -- -D warnings` (pass); `cargo test --workspace` (pass); `cargo xtask check-deps` (pass) | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
 
-Next task: `5.replan` / Phase 6 planning only after external smoke/nightly proof is accepted or completed.
+Next task: Phase 6 `6.A.1` is blocked until external Phase 5 clean-VM smoke and remote-nightly proof are accepted or completed.

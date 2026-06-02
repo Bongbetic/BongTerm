@@ -39,10 +39,14 @@
 | **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
-| **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — all planned code/doc/test artifacts implemented; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
-| **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
+| **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
+| **Phase 6** Dogfood → Public | 📋 Planned / not started — Phase 6 plan exists; start is blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-03, phase-5 closeout)
+### Current status (2026-06-03, phase-5 closeout committed)
+
+Committed closeout: `d221e06 feat(phase5): close hardening release prep` on
+branch `codex/phase5-hardening-closeout`. Worktree metadata was pruned and the
+working tree was clean after the commit.
 
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
@@ -69,9 +73,9 @@ Latest local verification:
 
 ### Next actionables (priority order)
 
-1. **External CI proof** — push/PR and wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
+1. **External CI proof** — push/PR branch `codex/phase5-hardening-closeout` and wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
 2. **Manual Phase 5 release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-3. **Phase 6 re-plan** — after external proof requirements are accepted or completed, re-plan dogfood/public release.
+3. **Phase 6 start** — after external proof requirements are accepted or completed, begin Stage A dogfood.
 
 ### Key known issues / deferred items
 
@@ -222,17 +226,19 @@ Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 - [done] 5.F.3 `known-issues.md` published
 - [done] 5.F.4 Rollback plan documented in `docs/runbook/release.md`
 - [block] 5.exit Phase 5 exit gate: local gates green; clean-VM signed install smoke remains external.
-- [next] 5.replan **Invoke `superpowers:writing-plans`** for Phase 6 after external smoke/nightly proof is accepted or completed
+- [done] 5.replan **Invoke `superpowers:writing-plans`** for Phase 6
 
 ---
 
 ## PHASE 6 — Dogfood + Public Release
 
 > Phase 6 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase6.md` (24 tasks). AnythingLLM `engineer` workspace consulted.
+>
+> Phase 6 start is blocked until Phase 5 clean-VM signed install smoke and remote-nightly proof are accepted or completed.
 
 Gates: spec §6.1 #22 + §6.6 ship-when checklist.
 
-- 6.A.1 Begin Stage A: BongT as default terminal; daily log in `docs/dogfood/<date>.md`
+- [next][block] 6.A.1 Begin Stage A: BongT as default terminal; daily log in `docs/dogfood/<date>.md` *(blocked on Phase 5 external smoke/nightly proof)*
 - 6.A.2 Stage A workload minimums (per spec §6.2): ≥1 long-running cmd/wk, ≥1 explainer use/wk, ≥1 Cmd-K use/wk, ≥1 shell switch/wk, ≥1 agent run/working-day, ≥1 MCP session/wk if MCP shipped, ≥1 crash drill/wk
 - 6.A.3 Stage A exit: 30 working days; zero P0/P1 defects; zero confirmed secret leaks
 - 6.B.1 Recruit Stage B users (r/rust, r/PowerShell, r/commandline, ex-colleagues) — 3-5 people / 14 days
