@@ -138,4 +138,43 @@ mod tests {
             "SecretValue Debug must not leak plaintext, got: {debug}"
         );
     }
+
+    // -------------------------------------------------------------------------
+    // Test 6 — env block never carries a missing secret (fails closed)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn env_block_fails_closed_on_missing_secret() {
+        use bongterm_vault_windows::{InMemoryBackend, WindowsVault};
+
+        let vault = WindowsVault::with_backend_and_authz(
+            InMemoryBackend::new(),
+            std::collections::HashMap::new(),
+        );
+        let spec = vec![("TOKEN".to_string(), "${secret:NOPE}".to_string())];
+        let result = vault.build_env_block(&spec, &ConsumerId("agent:x".to_string()));
+        assert!(
+            result.is_err(),
+            "missing secret must fail closed, never empty env var"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 7 — dangerous command is never silently Advisory
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn dangerous_command_never_advisory() {
+        use bongterm_security::dangerous::DangerousCommandMatcher;
+
+        let matcher = DangerousCommandMatcher::new();
+        let kind = matcher
+            .classify("git push --force")
+            .expect("must be flagged");
+        assert_ne!(
+            kind.enforcement(),
+            EnforcementLevel::Advisory,
+            "dangerous commands must require approval or deny, never Advisory"
+        );
+    }
 }

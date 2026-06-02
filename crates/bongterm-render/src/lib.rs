@@ -11,6 +11,8 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
 
+pub mod device_loss;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -137,6 +139,11 @@ pub trait RendererBackend: Send + Sync {
 
     /// Collect current renderer metrics.
     fn collect_metrics(&self) -> RendererMetrics;
+
+    /// Recreate device-bound renderer resources after device loss.
+    fn recover_device_loss(&self) -> Result<(), RenderError> {
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------

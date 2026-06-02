@@ -148,6 +148,7 @@ fn parse_window_secs(s: &str) -> Option<u64> {
 }
 
 /// Match a duration spec like `>5s`, `<5m`, or `>=10s`.
+#[allow(clippy::cast_precision_loss)]
 fn match_duration(spec: &str, value_secs: f64) -> bool {
     let (op, rest) = if let Some(rest) = spec.strip_prefix(">=") {
         (">=", rest)

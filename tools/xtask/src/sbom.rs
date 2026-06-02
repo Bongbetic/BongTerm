@@ -18,6 +18,13 @@ pub fn run() -> Result<()> {
             "purl": format!("pkg:cargo/{}@{}", pkg.name, pkg.version),
         }));
     }
+    components.push(json!({
+        "type": "library",
+        "name": "vendored-wezterm",
+        "version": "pinned-submodule",
+        "licenses": [{ "license": { "name": "MIT" }}],
+        "purl": "pkg:generic/vendored-wezterm@pinned-submodule",
+    }));
     let sbom = json!({
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
@@ -31,7 +38,7 @@ pub fn run() -> Result<()> {
         .context("write sbom.cdx.json")?;
     println!(
         "sbom: wrote sbom.cdx.json ({} components)",
-        metadata.packages.len()
+        components.len()
     );
     Ok(())
 }

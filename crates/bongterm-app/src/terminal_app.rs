@@ -160,6 +160,11 @@ impl TerminalApp {
     }
 
     #[must_use]
+    pub fn snapshot_id(&self) -> bongterm_render::SnapshotId {
+        self.snapshot.id
+    }
+
+    #[must_use]
     pub const fn theme(&self) -> Theme {
         Theme::Dark
     }
@@ -189,7 +194,7 @@ fn pane_worker(shell: &String) -> impl Stream<Item = Message> + use<> {
             let spec = ChildSpec {
                 command: shell.into(),
                 args: Vec::new(),
-                cwd: None,
+                cwd: std::env::current_dir().ok(),
                 env: Vec::new(),
                 cols: COLS,
                 rows: ROWS,

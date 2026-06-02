@@ -1,6 +1,6 @@
 # Code Signing Runbook
 
-**Status:** Placeholder — implemented Phase 5.B.3
+**Status:** Phase 5 release-prep runbook
 
 ## Overview
 
@@ -22,4 +22,4 @@ See `docs/runbook/smartscreen.md` for warm-up plan after first public release.
 ## Secrets
 
 The signing certificate private key is stored in Windows Certificate Store (not in git, not in `.env`).  
-See `docs/adr/` for the cert provisioning ADR once created.
+See `docs/adr/0014-ev-cert-evaluation.md` for the OV-first / EV-later decision.

@@ -12,6 +12,7 @@ use std::collections::HashMap;
 /// Render a snippet by substituting all `${param:name}` placeholders.
 ///
 /// Returns [`DevassistError::MissingParam`] naming the first absent parameter.
+#[allow(clippy::implicit_hasher)]
 pub fn render_snippet(
     snippet: &Snippet,
     params: &HashMap<String, String>,

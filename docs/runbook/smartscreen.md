@@ -1,6 +1,6 @@
 # SmartScreen Runbook
 
-**Status:** Placeholder — implemented Phase 5.B.5
+**Status:** Phase 5 release-prep runbook
 
 ## Problem
 

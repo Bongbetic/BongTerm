@@ -18,6 +18,9 @@ impl MockNotifier {
     }
 
     /// Snapshot of recorded toasts.
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
     #[must_use]
     pub fn toasts(&self) -> Vec<Toast> {
         self.toasts.lock().unwrap().clone()

@@ -1,6 +1,6 @@
 //! bongterm-devassist
 //!
-//! Developer-UX features for BongTerm MVP-0: Cmd-K AI assist, failed-command
+//! Developer-UX features for `BongTerm` MVP-0: Cmd-K AI assist, failed-command
 //! explainer, smart history, snippets, background jobs, clickable patterns.
 //!
 //! See `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` Section 1.2 for

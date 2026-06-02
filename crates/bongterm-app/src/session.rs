@@ -39,7 +39,7 @@ impl TerminalSession {
         let spec = ChildSpec {
             command: PathBuf::from(program),
             args: args.iter().map(|s| (*s).to_string()).collect(),
-            cwd: None,
+            cwd: std::env::current_dir().ok(),
             env: Vec::new(),
             cols,
             rows,

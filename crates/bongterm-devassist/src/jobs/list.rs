@@ -116,7 +116,7 @@ mod tests {
         assert_eq!(snap.rows.len(), 1);
         assert_eq!(snap.rows[0].label, "npm install");
         assert_eq!(snap.rows[0].status_label, "running");
-        assert_eq!(snap.rows[0].is_terminal, false);
+        assert!(!snap.rows[0].is_terminal);
     }
 
     #[test]

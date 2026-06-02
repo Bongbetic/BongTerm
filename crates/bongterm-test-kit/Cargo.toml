@@ -14,9 +14,12 @@ bongterm-term = { path = "../bongterm-term" }
 bongterm-render = { path = "../bongterm-render" }
 bongterm-agents = { path = "../bongterm-agents" }
 bongterm-devassist = { path = "../bongterm-devassist" }
+bongterm-diagnostics = { path = "../bongterm-diagnostics" }
 bongterm-mcp = { path = "../bongterm-mcp" }
 bongterm-process-control = { path = "../bongterm-process-control" }
 bongterm-settings = { path = "../bongterm-settings" }
+bongterm-ui = { path = "../bongterm-ui" }
+bongterm-vault-windows = { path = "../bongterm-vault-windows" }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 time = { workspace = true }

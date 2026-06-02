@@ -8,6 +8,12 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
 
+pub mod dangerous;
+pub mod forbidden;
+pub mod prod_mode;
+pub mod redactor;
+pub mod trust;
+
 use std::fmt;
 use std::sync::{Arc, Mutex};
 

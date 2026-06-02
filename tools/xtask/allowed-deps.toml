@@ -81,4 +81,5 @@ allowed = [
     "bongterm-blocks", "bongterm-agents", "bongterm-mcp", "bongterm-ledger",
     "bongterm-process-control", "bongterm-secrets-api", "bongterm-security",
     "bongterm-storage-api", "bongterm-settings", "bongterm-devassist",
+    "bongterm-diagnostics", "bongterm-ui", "bongterm-vault-windows",
 ]

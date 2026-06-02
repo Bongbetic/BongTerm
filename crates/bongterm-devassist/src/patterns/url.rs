@@ -74,6 +74,7 @@ pub fn scan_urls(line: &str) -> Vec<UrlSpan> {
 }
 
 /// Parse OSC 8 hyperlinks from raw text with escape sequences.
+#[allow(clippy::unnecessary_wraps)]
 pub fn parse_osc8(raw: &str) -> Result<Vec<Osc8Link>, DevassistError> {
     let mut links = Vec::new();
     let open = "\x1b]8;";

@@ -40,6 +40,10 @@ enum Cmd {
     CleanupChunks,
     /// Produce signed MSIX artifact (Phase 5).
     PackageMsix,
+    /// Emit SLSA provenance attestation.
+    Attestation,
+    /// Scan for forbidden implementation techniques.
+    ForbiddenAbstraction,
 }
 
 fn main() -> Result<()> {
@@ -55,14 +59,18 @@ fn main() -> Result<()> {
         Cmd::PromptInjectionCorpus => prompt_injection_corpus::run(),
         Cmd::CleanupChunks => cleanup_chunks::run(),
         Cmd::PackageMsix => package_msix::run(),
+        Cmd::Attestation => attestation::run(),
+        Cmd::ForbiddenAbstraction => forbidden_abstraction::run(),
     }
 }
 
+mod attestation;
 mod bench_report;
 mod check_deps;
 mod check_licenses;
 mod cleanup_chunks;
 mod doctor;
+mod forbidden_abstraction;
 mod package_msix;
 mod prompt_injection_corpus;
 mod sbom;

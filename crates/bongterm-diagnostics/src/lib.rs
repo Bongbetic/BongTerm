@@ -11,6 +11,11 @@
 
 use std::path::PathBuf;
 
+pub mod consent;
+pub mod export;
+pub mod minidump;
+pub mod recovery;
+
 /// Returns the directory where crash logs and minidumps are written.
 #[must_use]
 pub fn crash_dir() -> PathBuf {

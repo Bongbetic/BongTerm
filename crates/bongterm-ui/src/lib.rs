@@ -11,8 +11,11 @@ use bongterm_settings::{KeybindingSettings, Settings};
 use iced::widget::{button, column, container, row, stack, text, text_input};
 use iced::{Element, Length, Task, Theme};
 
+pub mod accessibility;
 pub mod agent_sidebar;
 pub mod devux;
+pub mod dpi;
+pub mod ime;
 
 pub type ShellResult = iced::Result;
 

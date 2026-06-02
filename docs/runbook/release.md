@@ -1,6 +1,6 @@
 # Release Runbook
 
-**Status:** Placeholder — implemented Phase 5.F.4
+**Status:** Phase 5 release-prep runbook
 
 ## Release artifact checklist (spec §6.4)
 
@@ -34,4 +34,4 @@ If a critical bug is found within 48 h of public release:
 
 ## Steps
 
-See Phase 6 tasks in `orca.md` for the full ordered procedure.
+Phase 6 owns dogfood and public-release execution. This runbook owns rollback and artifact completeness.

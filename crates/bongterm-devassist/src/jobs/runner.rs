@@ -2,7 +2,7 @@
 //!
 //! Jobs run in a background pane off the hot path. On terminal state the runner
 //! emits a desktop toast via the [`Notifier`] port. The real implementation
-//! wraps WinRT notifications; tests use a recording mock.
+//! wraps `WinRT` notifications; tests use a recording mock.
 use crate::DevassistError;
 use tokio::process::Command;
 
@@ -108,7 +108,7 @@ impl Toast {
     }
 }
 
-/// Port for emitting desktop notifications. Real impl wraps WinRT; tests inject
+/// Port for emitting desktop notifications. Real impl wraps `WinRT`; tests inject
 /// `MockNotifier`, keeping `windows` out of pure job logic.
 pub trait Notifier: Send + Sync {
     fn notify(&self, toast: &Toast);
@@ -157,7 +157,7 @@ impl<'n> JobRunner<'n> {
         let final_state = self.finish(
             &spec,
             JobOutcome::Exited {
-                code: exit_code as i64,
+                code: i64::from(exit_code),
             },
         );
         Ok(JobCompletion { final_state })
@@ -165,6 +165,8 @@ impl<'n> JobRunner<'n> {
 
     /// Map an outcome to a terminal [`JobState`], emit the matching toast, and
     /// return the final state.
+    #[allow(clippy::needless_pass_by_value)]
+    #[must_use]
     pub fn finish(&self, spec: &JobSpec, outcome: JobOutcome) -> JobState {
         let state = match outcome {
             JobOutcome::Exited { code: 0 } => JobState::Succeeded,

@@ -163,6 +163,13 @@ pub trait VramSampler: Send + Sync {
 pub struct CurrentProcessSampler {
     vram_sampler: Arc<dyn VramSampler>,
     state: Mutex<SamplerState>,
+    registered: Mutex<Vec<RegisteredProcess>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RegisteredProcess {
+    pid: u32,
+    category: ProcessCategory,
 }
 
 // The `last_*` prefix is meaningful: each field is the previous sample's value,
@@ -184,7 +191,22 @@ impl CurrentProcessSampler {
                 last_wall: Instant::now(),
                 last_sample: None,
             }),
+            registered: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Register a child PID for resource-dashboard attribution.
+    ///
+    /// This is advisory bookkeeping, not a security boundary. The sampler
+    /// includes registered PIDs in dashboard rows so app wiring can attribute
+    /// panes, agents, MCP servers, and plugins by process category.
+    pub fn register_pid(&self, pid: u32, category: ProcessCategory) {
+        let mut registered = self.registered.lock();
+        if let Some(existing) = registered.iter_mut().find(|entry| entry.pid == pid) {
+            existing.category = category;
+            return;
+        }
+        registered.push(RegisteredProcess { pid, category });
     }
 
     fn collect_process_sample(state: &mut SamplerState) -> ProcessSample {
@@ -207,10 +229,27 @@ impl ResourceSampler for CurrentProcessSampler {
     fn take_sample(&self) -> ResourceSample {
         let mut state = self.state.lock();
         let process = Self::collect_process_sample(&mut state);
+        let registered = self
+            .registered
+            .lock()
+            .iter()
+            .map(|entry| ProcessSample {
+                category: entry.category,
+                pid: entry.pid,
+                rss_bytes: platform::sample_process_rss(entry.pid),
+                cpu_fraction: 0.0,
+                io_read_bps: 0,
+                io_write_bps: 0,
+                handle_count: 0,
+            })
+            .collect::<Vec<_>>();
         let vram = self.vram_sampler.sample();
+        let mut processes = Vec::with_capacity(1 + registered.len());
+        processes.push(process);
+        processes.extend(registered);
         let sample = ResourceSample {
             captured_at: Instant::now(),
-            processes: vec![process],
+            processes,
             vram,
             is_stale: false,
         };
@@ -498,6 +537,37 @@ mod platform {
             })
         }
     }
+
+    #[allow(clippy::cast_possible_truncation)]
+    pub(super) fn sample_process_rss(pid: u32) -> u64 {
+        use windows::Win32::{
+            Foundation::CloseHandle,
+            System::{
+                ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS},
+                Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ},
+            },
+        };
+        unsafe {
+            let Ok(handle) = OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
+                false,
+                pid,
+            ) else {
+                return 0;
+            };
+            let mut mc = PROCESS_MEMORY_COUNTERS {
+                cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+                ..Default::default()
+            };
+            let rss = if GetProcessMemoryInfo(handle, &raw mut mc, mc.cb).is_ok() {
+                mc.WorkingSetSize as u64
+            } else {
+                0
+            };
+            let _ = CloseHandle(handle);
+            rss
+        }
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -512,6 +582,10 @@ mod platform {
 
     pub(super) fn query_vram() -> Option<VramInfo> {
         None
+    }
+
+    pub(super) fn sample_process_rss(_pid: u32) -> u64 {
+        0
     }
 }
 
@@ -676,6 +750,20 @@ mod tests {
         let sampler = CurrentProcessSampler::new(vram);
         let sample = sampler.take_sample();
         assert_eq!(sample.vram, Some(info));
+    }
+
+    #[test]
+    fn current_process_sampler_includes_registered_child_pids() {
+        let vram = Arc::new(MockVramSampler::unavailable());
+        let sampler = CurrentProcessSampler::new(vram);
+        sampler.register_pid(42, ProcessCategory::Shell);
+        let sample = sampler.take_sample();
+        assert!(
+            sample
+                .processes
+                .iter()
+                .any(|p| { p.pid == 42 && p.category == ProcessCategory::Shell })
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! File:line clickable-pattern matchers for Node/Python/Rust/.NET/TS.
+//! `File:line` clickable-pattern matchers for Node/Python/Rust/.NET/TS.
 //!
 //! Produces overlay spans only; it does not mutate terminal scrollback.
 
@@ -50,6 +50,9 @@ static RE_DOTNET: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Scan one output line for clickable file locations.
+///
+/// # Panics
+/// Panics if a regex capture unexpectedly lacks a full match.
 #[must_use]
 pub fn scan_file_locations(line: &str) -> Vec<FileSpan> {
     let mut spans = Vec::new();

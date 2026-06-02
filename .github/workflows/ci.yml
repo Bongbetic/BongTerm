@@ -37,6 +37,18 @@ jobs:
       - name: xtask check-deps
         run: cargo xtask check-deps
 
+      - name: xtask forbidden-abstraction
+        run: cargo xtask forbidden-abstraction
+
+      - name: xtask sbom
+        run: cargo xtask sbom
+
+      - name: xtask attestation
+        run: cargo xtask attestation
+
+      - name: xtask package-msix manifest smoke
+        run: cargo xtask package-msix
+
       - name: build release smoke
         run: cargo build --release --workspace
 

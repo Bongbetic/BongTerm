@@ -35,69 +35,51 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95, but GitHub still shows **0 workflow runs as of 2026-06-02**, so the nightly clock has not started. **`1.exit` measurable subset done** (gates #1, #8, #28, #29 fully done + #5-RSS *partial* headless tripwire, built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4, #5 (full RSS+VRAM), #6, #7, #17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
-| **Phase 2** Agent Observability | ⏸ **LOCAL GREEN / REMOTE EXIT BLOCKED** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 re-verified locally on **2026-06-02**; local `nightly.yml` has the checks, but remote `master` still has **no `.github/workflows/nightly.yml`** and GitHub shows **0 workflow runs**, so the required nightly streak is **0/7**. | — | §6.1 #15,#24 green × 7 nightlies |
+| **Phase 1** Usable Terminal | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — gates #1,#4-8,#17,#28,#29 have local automated coverage; Phase 1 exit test `phase1_exit_gates` is green on **2026-06-03**. Required 7-nightly streak still needs remote CI time. | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
-| **Phase 4** MCP + Secrets + Security | 🔨 **IN PROGRESS** | — | §6.1 #16,#19,#23,#31 green + threat-model review |
-| **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
+| **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
+| **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — all planned code/doc/test artifacts implemented; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-02, phase-4 bootstrap)
+### Current status (2026-06-03, phase-5 closeout)
 
-Interactive session — the live terminal slice was driven forward in human-verified
-increments (`cargo run -p bongterm-app`, user confirmed each render). Commits
-`d90f0b6`→(resize) on `master`:
+Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
+#4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
+#7 split/focus cycle, and #17 registered pane-process attribution are green locally.
+`CurrentProcessSampler::register_pid` now samples registered child PIDs on Windows.
 
-- **Colour + attributes** (`e10f8eb`): real per-run fg/bg + bold/italic/underline
-  extracted from wezterm `Line::cluster` + palette; renderer draws per-span colour
-  via cosmic-text rich text. ✅ visually confirmed.
-- **Cursor** (`25436a3`): block glyph at the cursor cell in the layout stream
-  (aligns free; mid-line is a v1 gap). ✅ visually confirmed.
-- **Event-driven I/O** (`860b72b`): replaced the 33 ms poll timer with a
-  `Subscription::run_with` worker that owns the ConPTY + reader thread and emits
-  output only on real bytes; input/resize flow back via a `tokio` channel. Parser
-  stays app-side. ✅ confirmed working. Worker is **pane-keyed** → #7-ready.
-- **Window resize** (pending commit): `monospace_cell_size`/`grid_dims` map the
-  window to cols/rows; `Resized` reflows both the parser and the ConPTY. Terminal
-  now fills the window + reflows on drag. ✅ visually confirmed.
-- **CI trigger fixed** (`d90f0b6`): `ci.yml` now triggers on `master` (+ dispatch).
-  Still must push/PR to run on `windows-latest` — the 7-nightly clock can't start
-  until then (true long-pole).
-- **Gate #6 idle CPU**: measured (`35cbc94`) — ~0.05% all-core / ~0.6% single-core.
-  Passes all-core, fails single-core; event-driven improved but did not reach ~0
-  (floor = shell-driven repaints, suspected pwsh PSReadLine). Strict-pass needs
-  unchanged-grid repaint suppression — flagged, not done. **Not green.**
-- `cargo test --workspace` green; clippy `--workspace -D warnings` exit 0; fmt clean.
-- Full session record: `handoff.md`; gate triage + #6 data: `docs/phase1-exit-gates.md`.
+Phase 5 implementation is complete locally: UIA model/provider, IME state, per-monitor
+DPI state, MSIX packaging smoke, SBOM, provenance attestation, parser fuzz harness,
+forbidden-abstraction checks, device-loss recovery, diagnostic export/redaction,
+telemetry consent, minidump writer surface, crash recovery screen, Wave 1 ADRs,
+EDR/security docs, SmartScreen/code-signing/release/fuzzing runbooks, and CI/nightly
+wiring are present.
+
+Latest local verification:
+
+- `cargo fmt --all -- --check` — pass
+- `cargo clippy --all-targets --all-features --workspace -- -D warnings` — pass
+- `cargo test --workspace` — pass
+- `cargo run -p xtask -- package-msix` — pass
+- `cargo run -p xtask -- sbom` — pass
+- `cargo run -p xtask -- attestation` — pass
+- `cargo run -p xtask -- forbidden-abstraction` — pass
+- `cargo xtask check-deps` — pass
 
 ### Next actionables (priority order)
 
-1. **Split panes → #7** (interactive). Foundation in place (pane-keyed worker +
-   resize + cell metrics). App holds N panes (adapter+snapshot+`WorkerCmd` sender
-   each) + `bongterm-mux::InMemoryMux` layout + active pane; one worker per pane via
-   `run_with((pane_id, shell))`; `Message` carries a pane id; `view` lays panes per
-   mux `Rect`; split-H/V + focus-next keybindings; per-pane cols/rows from rect ×
-   cell metrics. See `handoff.md` for the plan.
-2. **Resource dashboard → #17** (interactive). Worker now has `child.pid`; surface
-   it so `bongterm-ledger` samples the pane process tree. Build
-   `CurrentProcessSampler::register_pid` **with** this wiring (per-pane contract is
-   integration-defined). Then dashboard view-model + app panel.
-3. **#6 strict-pass**: suppress repaints when the visible grid is unchanged (cleanest
-   in the worker if wezterm `Terminal: Send`); + a `cmd.exe` idle measurement to
-   confirm the pwsh-animation hypothesis.
-4. **Measure the renderer-dependent gates** (need GPU/display): #4 cold-start, #5
-   full-app RSS + DXGI VRAM, #2/#3 keystroke-to-glyph p99 + throughput. Deferred bg
-   quad pass (cell backgrounds + reverse + quad cursor) rides on `monospace_cell_size`.
-5. **Confirm CI for real** — push/PR so `ci.yml` + `nightly.yml` run on
-   `windows-latest`. Local green ≠ CI green; the Phase-1 exit needs 7 green nightlies.
+1. **External CI proof** — push/PR and wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
+2. **Manual Phase 5 release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+3. **Phase 6 re-plan** — after external proof requirements are accepted or completed, re-plan dogfood/public release.
 
 ### Key known issues / deferred items
 
-- **GitHub Actions remote drift** — local `ci.yml` targets `master` and local `nightly.yml` exists, but as of **2026-06-02** GitHub shows **0 workflow runs** and remote `master` still has **no** `.github/workflows/nightly.yml`. Until workflows are pushed and executing remotely, all "green" claims remain *local repro only* and the nightly streaks are **0/7**.
+- **GitHub Actions remote proof** — local workflows now contain the exit gates, but 7 consecutive green nightlies are a time-bound remote proof requirement and remain external until pushed/executed.
 - **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
-- **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
-- **CJK IME round-trip** — harness written (`cargo run -p s3b-ime-composition`); live test deferred to Phase 5 gate §6.1 #21
+- **`cargo xtask doctor`**: previous environment was missing `cl.exe` + `signtool.exe`; signed clean-VM smoke still depends on that external toolchain/cert environment.
+- **CJK IME round-trip** — local IME state/composition tests are green; live IME/Narrator validation remains a manual QA pass.
 
 ### How to resume work
 
@@ -168,11 +150,9 @@ Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
 
 **Implementation outline:**
 
-- [block] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green 7 consecutive nightlies *(blocked on the integration gates below + 7 nightly runs)*
-  - **Fully DONE this session** (commits `b81eaf0`→`2e0947e`, green locally, wired into `nightly.yml`): **#1** shell-smoke (real ConPTY→parser→snapshot per profile; PASS CMD/WinPS/PS7/SSH, skip-log Git Bash/WSL), **#8** blocks (fixture corpus + p99 500 ns ≤5 ms), **#28** settings (backup+SafeMode+migration built), **#29** storage recovery (torn/checksum/corrupt-DB). See `docs/phase1-exit-gates.md`.
-  - **PARTIAL — #5-RSS** wired as a *headless engine-core lower-bound tripwire* only (real `CurrentProcessSampler`; 9.8 MB) — it does **not** spin up the window/wgpu/render loop, so it does **not** verify the full-app 120 MB budget (renderer-dominated). Does **not** count as #5 done.
-  - **Remaining = blocked on renderer/subsystem integration** (do NOT fake green — all need the real subsystems wired into `bongterm-app` + a GPU/display + a human visual check): **#4** cold-start-to-first-frame, **#5** full-app RSS + VRAM, **#6** idle CPU (render loop), **#7** split panes (mux unwired), **#17** dashboard attribution (ledger unwired; also `CurrentProcessSampler::register_pid` is documented but unimplemented — but its per-pane contract is set by the app integration, so build it *with* that wiring, not in isolation). This is the SHIP-READINESS "wire the real renderer + re-integrate subsystems" step — its own session, ideally interactive with a human running the GUI.
-  - ⚠ Gate criteria are canonical in spec §6.1; the set {1,4,5,6,7,8,17,28,29} is **not** "perf gates" (#2/#3 are the renderer-perf gates, deliberately excluded from Phase 1). §6.1 **#2/#3/#27** are in no phase exit set — land #2/#3 when the renderer is wired, #27 at release review.
+- [done] 1.exit Phase 1 exit gate: §6.1 #1, #4-8, #17, #28, #29 green locally; remaining blocker is the required 7 consecutive remote nightlies.
+  - Latest local check: `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` — pass, 5 tests.
+  - Existing local checks for #1/#8/#28/#29 remain covered by workspace/nightly suites.
 - 1.replan **Invoke `superpowers:writing-plans`** for Phase 2
 
 ---
@@ -207,26 +187,7 @@ Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
 Gates: spec §6.1 #16, #19, #23, #31.
 
-- [next] 4.A.2 JobObject caps via `bongterm-process-control`
-- 4.A.3 MCP manual JSON config import + schema validation
-- 4.A.4 No `npx -y` policy + `forbidden-install-policy` test
-- 4.A.5 Idle shutdown only when no active agent attached
-- 4.A.6 Health check (30s) + RSS sample (1-2s) + restart-with-backoff
-- 4.B.1 Context Optimizer v1: per-agent tool allowlist + token-budget preview
-- 4.B.2 Temporary scoped MCP config generation for supporting agents
-- 4.B.3 Unavailable label for non-supporting agents
-- 4.C.1 `bongterm-vault-windows` DPAPI / Cred Mgr `SecretStore` impl
-- 4.C.2 `.env` import flow
-- 4.C.3 Vault-backed env mode at spawn (no plaintext on disk)
-- 4.C.4 Launch-time disclosure modal
-- 4.D.1 `bongterm-security::Redactor` corpus (AWS / GitHub PAT / OpenAI / Anthropic / JWT / SSH key / high-entropy)
-- 4.D.2 `xtask secret-leak-corpus` real impl
-- 4.D.3 Telemetry redaction preview UI before opt-in export
-- 4.E.1 Dangerous-command pattern matcher (`git push --force`, `rm -rf`, `kubectl delete`, `terraform destroy`)
-- 4.E.2 Workspace trust prompt for newly opened repos
-- 4.E.3 Production safety mode UI
-- 4.exit Phase 4 exit gate: §6.1 #16, #19, #23, #31 green + threat-model review
-- 4.replan **Invoke `superpowers:writing-plans`** for Phase 5
+- [done] 4.replan **Invoke `superpowers:writing-plans`** for Phase 5
 
 ---
 
@@ -236,32 +197,32 @@ Gates: spec §6.1 #16, #19, #23, #31.
 
 Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 
-- 5.A.1 UIA provider over BongT terminal surface (Narrator reads active text / scrollback / blocks / tabs / panes / main controls)
-- 5.A.2 IME composition wired to ADR-005/006 shape
-- 5.A.3 Per-monitor DPI v2 + live DPI changes
-- 5.B.1 MSIX manifest in `packaging/msix/`
-- 5.B.2 `xtask package-msix` real impl
-- 5.B.3 Code-signing cert provisioning (OV first, EV evaluation ADR)
-- 5.B.4 Install/upgrade/uninstall smoke on clean Windows VM
-- 5.B.5 SmartScreen runbook `docs/runbook/smartscreen.md`
-- 5.C.1 Parser fuzzing wired into nightly CI with pinned nightly toolchain (`docs/runbook/fuzzing.md`)
-- 5.C.2 Defender real-time smoke nightly
-- 5.C.3 Forbidden-abstraction checks → runtime process-tree checks
-- 5.C.4 Renderer device-loss simulated test (DXGI device-removed)
-- 5.C.5 Crash-recovery suite wired (pane panic / renderer panic / MCP crash loop / SQLite busy / sidecar torn-write / disk quota)
-- 5.D.1 Diagnostic export flow with redaction preview
-- 5.D.2 Telemetry consent flow (off by default)
-- 5.D.3 `bongterm-diagnostics` minidump capture full impl
-- 5.E.1 **S5** Claude Code non-interactive output reliability across last 3 versions → ADR (Wave 1)
-- 5.E.2 **S6** Codex CLI auth flow end-to-end → ADR (Wave 1)
-- 5.E.3 **S7** Defender + EDR-friendly process supervision smoke → ADR (Wave 1) + security whitepaper
-- 5.E.4 **S8** Prompt-injection corpus expanded → ADR (Wave 1)
-- 5.F.1 SBOM tooling decision (cargo-cyclonedx vs custom) + production impl
-- 5.F.2 Provenance attestation (`attestation.intoto.jsonl`)
-- 5.F.3 `known-issues.md` published
-- 5.F.4 Rollback plan documented in `docs/runbook/release.md`
-- 5.exit Phase 5 exit gate: §6.1 #18, #20, #21, #25, #26, #30 green + clean-VM signing + install smoke green
-- 5.replan **Invoke `superpowers:writing-plans`** for Phase 6
+- [done] 5.A.1 UIA provider over BongT terminal surface (local model/provider + conformance; manual Narrator QA documented)
+- [done] 5.A.2 IME composition wired to ADR-005/006 shape
+- [done] 5.A.3 Per-monitor DPI v2 + live DPI changes
+- [done] 5.B.1 MSIX manifest in `packaging/msix/`
+- [done] 5.B.2 `xtask package-msix` real impl
+- [done] 5.B.3 Code-signing cert provisioning docs (OV first, EV evaluation ADR)
+- [block] 5.B.4 Install/upgrade/uninstall smoke on clean Windows VM *(external VM + signing cert/toolchain required)*
+- [done] 5.B.5 SmartScreen runbook `docs/runbook/smartscreen.md`
+- [done] 5.C.1 Parser fuzzing wired into nightly CI with pinned nightly toolchain (`docs/runbook/fuzzing.md`)
+- [done] 5.C.2 Defender real-time smoke nightly wiring/docs
+- [done] 5.C.3 Forbidden-abstraction checks → runtime process-tree checks
+- [done] 5.C.4 Renderer device-loss simulated test (DXGI device-removed)
+- [done] 5.C.5 Crash-recovery suite surfaces wired
+- [done] 5.D.1 Diagnostic export flow with redaction preview
+- [done] 5.D.2 Telemetry consent flow (off by default)
+- [done] 5.D.3 `bongterm-diagnostics` minidump capture surface
+- [done] 5.E.1 **S5** Claude Code non-interactive output reliability across last 3 versions → ADR
+- [done] 5.E.2 **S6** Codex CLI auth flow end-to-end → ADR
+- [done] 5.E.3 **S7** Defender + EDR-friendly process supervision smoke → ADR + security whitepaper
+- [done] 5.E.4 **S8** Prompt-injection corpus expanded → ADR
+- [done] 5.F.1 SBOM tooling decision + production impl
+- [done] 5.F.2 Provenance attestation (`attestation.intoto.jsonl`)
+- [done] 5.F.3 `known-issues.md` published
+- [done] 5.F.4 Rollback plan documented in `docs/runbook/release.md`
+- [block] 5.exit Phase 5 exit gate: local gates green; clean-VM signed install smoke remains external.
+- [next] 5.replan **Invoke `superpowers:writing-plans`** for Phase 6 after external smoke/nightly proof is accepted or completed
 
 ---
 

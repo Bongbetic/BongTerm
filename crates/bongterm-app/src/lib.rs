@@ -6,3 +6,5 @@
 
 pub mod session;
 pub mod terminal_app;
+
+pub use terminal_app::{Message, TerminalApp};
