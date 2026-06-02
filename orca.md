@@ -195,7 +195,7 @@ Gates: spec §6.1 #15, #24.
 
 Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
-- [next] 3.F.1 `bongterm-ui::devux` view-models for Cmd-K, jobs, and clickable overlay rows
+- [next] 3.exit.1 `Phase 3 exit.1`: Gate #9 + #10 + #11 AI preview-no-spawn, explainer, smart-history E2E
 - 3.exit Phase 3 exit gate: §6.1 #9-14 green
 - 3.replan **Invoke `superpowers:writing-plans`** for Phase 4
 

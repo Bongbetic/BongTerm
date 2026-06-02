@@ -13,10 +13,42 @@ pub struct JobRow {
     pub state: JobState,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobRowView {
+    pub label: String,
+    pub status_label: String,
+    pub is_terminal: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct JobListSnapshot {
+    pub rows: Vec<JobRowView>,
+}
+
 /// Ordered list of background jobs.
 #[derive(Debug, Clone, Default)]
 pub struct JobList {
     rows: Vec<JobRow>,
+}
+
+#[must_use]
+fn status_label(state: &JobState) -> String {
+    match state {
+        JobState::Pending => "pending".to_string(),
+        JobState::Running => "running".to_string(),
+        JobState::Succeeded => "succeeded".to_string(),
+        JobState::Failed { .. } => "failed".to_string(),
+        JobState::Cancelled => "cancelled".to_string(),
+    }
+}
+
+#[must_use]
+fn map_row(row: &JobRow) -> JobRowView {
+    JobRowView {
+        label: row.label.clone(),
+        status_label: status_label(&row.state),
+        is_terminal: row.state.is_terminal(),
+    }
 }
 
 impl JobList {
@@ -43,8 +75,10 @@ impl JobList {
 
     /// Snapshot of all rows in registration order.
     #[must_use]
-    pub fn snapshot(&self) -> Vec<JobRow> {
-        self.rows.clone()
+    pub fn snapshot(&self) -> JobListSnapshot {
+        JobListSnapshot {
+            rows: self.rows.iter().map(map_row).collect(),
+        }
     }
 
     /// Count of non-terminal jobs.
@@ -77,13 +111,12 @@ mod tests {
     fn register_then_snapshot_shows_running_jobs() {
         let mut list = JobList::new();
         let s = spec("npm install");
-        let id = s.id;
         list.register(s, JobState::Running);
         let snap = list.snapshot();
-        assert_eq!(snap.len(), 1);
-        assert_eq!(snap[0].label, "npm install");
-        assert_eq!(snap[0].state, JobState::Running);
-        assert_eq!(snap[0].id, id);
+        assert_eq!(snap.rows.len(), 1);
+        assert_eq!(snap.rows[0].label, "npm install");
+        assert_eq!(snap.rows[0].status_label, "running");
+        assert_eq!(snap.rows[0].is_terminal, false);
     }
 
     #[test]
@@ -94,8 +127,9 @@ mod tests {
         list.register(s, JobState::Running);
         list.update(id, JobState::Succeeded);
         let snap = list.snapshot();
-        assert_eq!(snap.len(), 1);
-        assert_eq!(snap[0].state, JobState::Succeeded);
+        assert_eq!(snap.rows.len(), 1);
+        assert_eq!(snap.rows[0].status_label, "succeeded");
+        assert!(snap.rows[0].is_terminal);
     }
 
     #[test]

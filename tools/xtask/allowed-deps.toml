@@ -16,7 +16,7 @@ allowed = [
 ]
 
 [bongterm-ui]
-allowed = ["bongterm-settings", "bongterm-secrets-api", "bongterm-storage-api", "bongterm-render"]
+allowed = ["bongterm-settings", "bongterm-secrets-api", "bongterm-storage-api", "bongterm-render", "bongterm-devassist"]
 
 [bongterm-render]
 # Renderer must NOT import wezterm-term / termwiz directly.

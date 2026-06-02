@@ -5,6 +5,12 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
 /// Closed set of recognized file-location patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PatternKind {

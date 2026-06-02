@@ -12,6 +12,7 @@ use iced::widget::{button, column, container, row, stack, text, text_input};
 use iced::{Element, Length, Task, Theme};
 
 pub mod agent_sidebar;
+pub mod devux;
 
 pub type ShellResult = iced::Result;
 

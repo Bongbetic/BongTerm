@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 bongterm-settings = { path = "../bongterm-settings" }
+bongterm-devassist = { path = "../bongterm-devassist" }
 iced = { workspace = true }
 
 [dev-dependencies]
