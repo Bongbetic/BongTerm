@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.A.4 complete** — `ClaudeCodeAiRunner` subprocess wrapper plus graceful unavailable fallback.
+Current focus: **Phase 3 task 3.B.1 complete** — smart-history filter parser.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -16,3 +16,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.A.2 | Complete | RED: `cargo test -p bongterm-devassist ai::cmdk` first exposed a unit-test/test-kit type split, then failed correctly with unresolved `CmdKError`, `CmdKSession`, `CmdKState`. GREEN: `cargo test -p bongterm-devassist ai::cmdk` (pass, 3 tests); `cargo test -p bongterm-devassist` (pass, 7 tests) | Added `CmdKSession`, `CmdKState`, `CmdKError`, preview-only request flow, and explicit `confirm_run`. Kept mock-backed Cmd-K assertions in integration tests so `bongterm-test-kit` and devassist share the same external crate types. | 3.A.3 |
 | 3.A.3 | Complete | RED: `cargo test -p bongterm-devassist ai::explainer` failed with unresolved `Explainer`. GREEN: `cargo test -p bongterm-devassist ai::explainer` (pass, 3 tests); `cargo test -p bongterm-devassist` (pass, 10 tests) | Added non-zero-exit `Explainer`, bounded transcript-tail context, `ExplainFailure` requests, and zero-exit refusal. Mock-backed tests live in integration tests to avoid duplicate crate types. | 3.A.4 |
 | 3.A.4 | Complete | RED: `cargo test -p bongterm-devassist ai::runner` failed with unresolved `ClaudeProbe`, `ClaudeInfo`, `ClaudeCodeAiRunner`, `detect_backend`. GREEN: `cargo test -p bongterm-devassist ai::runner` (pass, 7 tests); `cargo test -p bongterm-devassist` (pass, 15 tests) | Added `ClaudeCodeAiRunner`, `ClaudeProbe`, `ClaudeInfo`, `detect_backend`, JSON result parsing, non-interactive argv builder, subprocess spawn, and labelled unavailable fallback when Claude Code is absent. | 3.B.1 |
+| 3.B.1 | Complete | RED: `cargo test -p bongterm-devassist history::filter` failed with unresolved `HistoryQuery`, `FilterKind`, `HistoryEntryMeta`. GREEN: `cargo test -p bongterm-devassist history::filter` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 19 tests) | Added smart-history `HistoryQuery` parser, closed `FilterKind`, `HistoryEntryMeta`, conjunctive matching, and `time:`/`duration:` window comparators. | 3.B.2 |
