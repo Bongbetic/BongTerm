@@ -66,3 +66,8 @@ At the end of the session:
 - Update `docs/codex/phase-status.md` for the active task only.
 - Record the last test run and any blocker briefly.
 - Leave the next task untouched for the next session.
+
+At the end of every phase:
+
+- Clean stale worktree metadata with `git worktree prune --verbose`.
+- Remove linked worktrees only when the target worktree is explicit and confirmed safe.
