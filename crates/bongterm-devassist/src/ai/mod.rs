@@ -8,5 +8,6 @@ pub mod runner;
 pub use cmdk::{CmdKError, CmdKSession, CmdKState};
 pub use explainer::Explainer;
 pub use runner::{
-    AiAvailability, AiBackend, AiContext, AiIntent, AiRequest, AiSuggestion, UnavailableBackend,
+    AiAvailability, AiBackend, AiContext, AiIntent, AiRequest, AiSuggestion, ClaudeCodeAiRunner,
+    ClaudeInfo, ClaudeProbe, UnavailableBackend, detect_backend,
 };
