@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.C.3 complete** — snippet store workspace/global merge and parameter-prompt model.
+Current focus: **Phase 3 task 3.D.1 complete** — background job model, toast payload, notifier port, and mock notifier.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -23,3 +23,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.C.1 | Complete | RED: `cargo test -p bongterm-devassist snippets::model` failed with unresolved `Snippet`, `SnippetLibrary`, `SnippetScope`. GREEN: `cargo test -p bongterm-devassist snippets::model` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 25 tests) | Added JSON5 snippet library loading, global/workspace scope enum, robust `${param:name}` extraction, duplicate suppression, malformed JSON parse errors, and malformed-placeholder tolerance. | 3.C.2 |
 | 3.C.2 | Complete | RED: `cargo test -p bongterm-devassist snippets::render` failed with unresolved `render_snippet`. GREEN: `cargo test -p bongterm-devassist snippets::render` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 29 tests) | Added single-pass snippet parameter substitution, full missing-param precheck, repeated placeholder replacement, and literal insertion for values containing placeholder syntax. | 3.C.3 |
 | 3.C.3 | Complete | RED: `cargo test -p bongterm-devassist snippets::model` failed with unresolved `SnippetStore`. GREEN: `cargo test -p bongterm-devassist snippets::model` (pass, 6 tests); `cargo test -p bongterm-devassist` (pass, 31 tests) | Added `SnippetStore` workspace-over-global name resolution, distinct merged names, and `ParamPrompt` generation from parsed snippet params. | 3.D.1 |
+| 3.D.1 | Complete | RED: `cargo test -p bongterm-devassist jobs::runner` failed with unresolved `JobState`, `JobSpec`, `JobId`, `Toast`, and placeholder `MockNotifier`. GREEN: `cargo test -p bongterm-devassist jobs::runner` (pass, 3 tests); `cargo test -p bongterm-devassist` (pass, 34 tests) | Added `JobId`, `JobSpec`, closed `JobState`, `Toast`/`ToastKind`, `Notifier` port, and `MockNotifier`; mock-backed assertion is integration-scoped to avoid duplicate devassist crate types. | 3.D.2 |
