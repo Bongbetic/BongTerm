@@ -98,6 +98,47 @@ pub trait Notifier: Send + Sync {
     fn notify(&self, toast: &Toast);
 }
 
+/// The raw outcome of running a job's process.
+///
+/// Produced by the spawn layer off the hot path and fed to
+/// [`JobRunner::finish`]. Separating outcome from state keeps transition and
+/// toast logic pure and unit-testable without spawning.
+#[derive(Debug, Clone)]
+pub enum JobOutcome {
+    /// Process exited with this code.
+    Exited { code: i64 },
+    /// Process could not be spawned.
+    SpawnError(String),
+    /// User cancelled before completion.
+    Cancelled,
+}
+
+/// Runs background jobs and emits a desktop toast on completion/failure.
+pub struct JobRunner<'n> {
+    notifier: &'n dyn Notifier,
+}
+
+impl<'n> JobRunner<'n> {
+    #[must_use]
+    pub fn new(notifier: &'n dyn Notifier) -> Self {
+        Self { notifier }
+    }
+
+    /// Map an outcome to a terminal [`JobState`], emit the matching toast, and
+    /// return the final state.
+    pub fn finish(&self, spec: &JobSpec, outcome: JobOutcome) -> JobState {
+        let state = match outcome {
+            JobOutcome::Exited { code: 0 } => JobState::Succeeded,
+            JobOutcome::Exited { code } => JobState::Failed { exit_code: code },
+            JobOutcome::SpawnError(_) => JobState::Failed { exit_code: -1 },
+            JobOutcome::Cancelled => JobState::Cancelled,
+        };
+        let toast = Toast::for_completion(spec, &state);
+        self.notifier.notify(&toast);
+        state
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
