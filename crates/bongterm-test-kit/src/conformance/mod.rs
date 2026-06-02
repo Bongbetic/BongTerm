@@ -6,6 +6,7 @@
 //! asserts the contract holds.
 
 pub mod agent_adapter_conformance;
+pub mod frecency_repo_conformance;
 pub mod mcp_transport_conformance;
 pub mod policy_evaluator_conformance;
 pub mod process_governor_conformance;
