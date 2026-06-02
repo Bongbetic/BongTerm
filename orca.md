@@ -35,9 +35,9 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95 (CI not yet run; `master`-vs-`main` trigger mismatch). **`1.exit` measurable subset done** (gates #1, #8, #28, #29 fully done + #5-RSS *partial* headless tripwire, built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4, #5 (full RSS+VRAM), #6, #7, #17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
-| **Phase 2** Agent Observability | 🔨 **CODE COMPLETE** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 GREEN locally + wired into `nightly.yml`; Phase 3 re-plan complete | — | §6.1 #15,#24 green × 7 nightlies |
-| **Phase 3** Developer UX | 🔨 **IN PROGRESS** — `[next]` = `3.F.1` devux view-models | — | §6.1 #9-14 green |
+| **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95, but GitHub still shows **0 workflow runs as of 2026-06-02**, so the nightly clock has not started. **`1.exit` measurable subset done** (gates #1, #8, #28, #29 fully done + #5-RSS *partial* headless tripwire, built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4, #5 (full RSS+VRAM), #6, #7, #17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 2** Agent Observability | ⏸ **LOCAL GREEN / REMOTE EXIT BLOCKED** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 re-verified locally on **2026-06-02**; local `nightly.yml` has the checks, but remote `master` still has **no `.github/workflows/nightly.yml`** and GitHub shows **0 workflow runs**, so the required nightly streak is **0/7**. | — | §6.1 #15,#24 green × 7 nightlies |
+| **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
@@ -93,7 +93,7 @@ increments (`cargo run -p bongterm-app`, user confirmed each render). Commits
 
 ### Key known issues / deferred items
 
-- **`ci.yml` trigger mismatch** — triggers on `push:[main]`+PRs but the working branch is `master`, so CI has never executed. Decide: retarget the trigger or rename the branch. Until then "green" means *local repro only*.
+- **GitHub Actions remote drift** — local `ci.yml` targets `master` and local `nightly.yml` exists, but as of **2026-06-02** GitHub shows **0 workflow runs** and remote `master` still has **no** `.github/workflows/nightly.yml`. Until workflows are pushed and executing remotely, all "green" claims remain *local repro only* and the nightly streaks are **0/7**.
 - **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: 2 FAIL (`cl.exe` + `signtool.exe`) — Phase 5 prerequisites, not Phase 0/1 blocking
@@ -185,7 +185,7 @@ Gates: spec §6.1 #15, #24.
 
 > **All Phase 2 implementation tasks complete** (2.A.0–2.C.3c + 2.D.1). Commits `5481a30`→`662e31b`. See `docs/codex/phase-status.md` for the per-task table.
 
-- 2.exit *(code done — awaiting operational green ×7 nightlies)* — gates #15 + #24 GREEN locally and wired into `.github/workflows/nightly.yml`. Exit also requires the Phase 1 gates (`1.exit`, still pending) for a fully green nightly.
+- 2.exit *(implementation done; true phase exit blocked on remote nightlies)* — gates #15 + #24 passed again locally on **2026-06-02** via `cargo test -p bongterm-agents --test gate15` and `cargo run -p xtask -- prompt-injection-corpus` (`32 scenarios passed gate #24`). Local `.github/workflows/nightly.yml` contains the gate steps, but remote `master` still has **no** `.github/workflows/nightly.yml` and GitHub currently shows **0 workflow runs**, so the required **7 consecutive green nightlies are still 0/7**. Exit also still depends on the broader Phase 1 nightly path becoming real.
 
 ---
 

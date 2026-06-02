@@ -7,7 +7,7 @@ Source of truth:
 
 Current focus: **Phase 3 fully complete** — exit gate coverage committed and all `3.exit` tests green.
 
-Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
+Phase 2 handoff: all code tasks are complete; gates #15 + #24 were re-verified GREEN locally on 2026-06-02, but true phase exit is still blocked remotely because GitHub currently shows 0 workflow runs and remote `master` does not yet contain `.github/workflows/nightly.yml`, so the required x7-nightly streak is still 0/7.
 
 | Task ID | Status | Last test run | Notes/blockers | Next task |
 | --- | --- | --- | --- | --- |
