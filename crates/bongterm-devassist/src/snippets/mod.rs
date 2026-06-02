@@ -1,3 +1,3 @@
 //! Snippets submodule.
 
-pub(crate) const MODULE_NAME: &str = "snippets";
+pub const MODULE_NAME: &str = "snippets";

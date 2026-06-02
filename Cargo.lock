@@ -476,6 +476,7 @@ name = "bongterm-test-kit"
 version = "0.0.0"
 dependencies = [
  "bongterm-agents",
+ "bongterm-devassist",
  "bongterm-mcp",
  "bongterm-process-control",
  "bongterm-render",

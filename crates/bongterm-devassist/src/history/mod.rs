@@ -1,3 +1,3 @@
 //! Smart history submodule.
 
-pub(crate) const MODULE_NAME: &str = "history";
+pub const MODULE_NAME: &str = "history";

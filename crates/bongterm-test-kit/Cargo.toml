@@ -13,6 +13,7 @@ bongterm-storage-api = { path = "../bongterm-storage-api" }
 bongterm-term = { path = "../bongterm-term" }
 bongterm-render = { path = "../bongterm-render" }
 bongterm-agents = { path = "../bongterm-agents" }
+bongterm-devassist = { path = "../bongterm-devassist" }
 bongterm-mcp = { path = "../bongterm-mcp" }
 bongterm-process-control = { path = "../bongterm-process-control" }
 bongterm-settings = { path = "../bongterm-settings" }
