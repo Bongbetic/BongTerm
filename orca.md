@@ -40,13 +40,21 @@
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
-| **Phase 6** Dogfood → Public | 📋 Planned / not started — Phase 6 plan exists; start is blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
+| **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-03, phase-5 closeout committed)
+### Current status (2026-06-03, phase-5 closeout committed; phase-6 prep added)
 
 Committed closeout: `d221e06 feat(phase5): close hardening release prep` on
 branch `codex/phase5-hardening-closeout`. Worktree metadata was pruned and the
 working tree was clean after the commit.
+
+Phase 6 Stage A prep is present: `docs/dogfood/README.md`,
+`docs/dogfood/_template.md`, and `docs/dogfood/stage-a-summary.md`.
+This does **not** start the 30-working-day dogfood clock. `6.A.1` remains
+blocked until the Phase 5 clean-VM signed install smoke and remote-nightly proof
+are accepted or completed. Attempted push of `codex/phase5-hardening-closeout`
+was rejected because the GitHub OAuth token lacks `workflow` scope for changed
+`.github/workflows/*.yml` files.
 
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
@@ -75,7 +83,7 @@ Latest local verification:
 
 1. **External CI proof** — push/PR branch `codex/phase5-hardening-closeout` and wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
 2. **Manual Phase 5 release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-3. **Phase 6 start** — after external proof requirements are accepted or completed, begin Stage A dogfood.
+3. **Phase 6 start** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 
@@ -235,6 +243,7 @@ Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 > Phase 6 re-plan completed: `docs/superpowers/plans/2026-05-29-bongt-phase6.md` (24 tasks). AnythingLLM `engineer` workspace consulted.
 >
 > Phase 6 start is blocked until Phase 5 clean-VM signed install smoke and remote-nightly proof are accepted or completed.
+> Stage A prep files are present, but daily dogfood logging has not started.
 
 Gates: spec §6.1 #22 + §6.6 ship-when checklist.
 

@@ -6,7 +6,7 @@ Source of truth:
 - Product intent: `docs/PRD/bongterm_prd_v7.md`
 - Execution control plane: `orca.md`
 
-Current focus: **Phase 5 local implementation complete and committed** on 2026-06-03.
+Current focus: **Phase 5 local implementation complete and committed; Phase 6 prep-only task 6.A.0 completed** on 2026-06-03.
 
 Commit: `d221e06 feat(phase5): close hardening release prep`
 
@@ -17,6 +17,10 @@ Phase 1 exit closure: local gates #1,#4-8,#17,#28,#29 are green. The remaining P
 Phase 2 exit closure: local gates #15 and #24 are green and wired into nightly. The remaining Phase 2 exit proof is the required 7 consecutive remote nightlies.
 
 Phase 5 exit closure: local code/doc/tooling gates are green and committed. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing toolchain/cert.
+
+Phase 6 prep: `docs/dogfood/README.md`, `docs/dogfood/_template.md`, and `docs/dogfood/stage-a-summary.md` now exist for 6.A.0. Stage A dogfood has **not** started.
+
+Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
