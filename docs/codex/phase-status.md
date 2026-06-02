@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.B.3 complete** — `SqliteFrecencyRepo` and `0002_frecency` migration.
+Current focus: **Phase 3 task 3.B.4 complete** — `SmartHistory` Ctrl+R filter-then-frecency ranking.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -19,3 +19,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.B.1 | Complete | RED: `cargo test -p bongterm-devassist history::filter` failed with unresolved `HistoryQuery`, `FilterKind`, `HistoryEntryMeta`. GREEN: `cargo test -p bongterm-devassist history::filter` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 19 tests) | Added smart-history `HistoryQuery` parser, closed `FilterKind`, `HistoryEntryMeta`, conjunctive matching, and `time:`/`duration:` window comparators. | 3.B.2 |
 | 3.B.2 | Complete | RED: `cargo test -p bongterm-test-kit frecency` failed with unresolved `FrecencyRepo`, `FrecencyRow`, `frecency_score`. GREEN: `cargo test -p bongterm-test-kit frecency` (pass, 1 test); `cargo test -p bongterm-storage-api` (pass, 7 tests) | Added `FrecencyRow`, `FrecencyRepo`, pure `frecency_score`, `MockFrecencyRepo`, and reusable conformance runner. | 3.B.3 |
 | 3.B.3 | Complete | RED: `cargo test -p bongterm-storage-sqlite frecency` failed with unresolved `SqliteFrecencyRepo`. GREEN: `cargo test -p bongterm-storage-sqlite frecency` (pass, 2 tests); `cargo test -p bongterm-storage-sqlite` (pass, 27 tests) | Added `SqliteFrecencyRepo`, idempotent `0002_frecency` table migration, conformance-backed ranking, and use-count update semantics. | 3.B.4 |
+| 3.B.4 | Complete | RED: `cargo test -p bongterm-devassist history::frecency` failed with unresolved `SmartHistory`. GREEN: `cargo test -p bongterm-devassist history::frecency` (pass, 2 tests); `cargo test -p bongterm-devassist` (pass, 21 tests) | Added pure `SmartHistory::search` that parses filters, excludes non-matches, computes frecency from age/use-count metadata, and returns ranked entries. | 3.C.1 |
