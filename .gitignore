@@ -9,6 +9,9 @@ Cargo.lock.bak
 *.swp
 *.swo
 
+# Local agent instructions
+AGENTS.md
+
 # OS
 Thumbs.db
 .DS_Store
