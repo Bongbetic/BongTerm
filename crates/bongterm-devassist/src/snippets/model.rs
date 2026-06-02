@@ -78,6 +78,64 @@ impl SnippetLibrary {
     }
 }
 
+/// The parameter-prompt model the UI renders before running a snippet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamPrompt {
+    pub snippet_name: String,
+    /// Parameter names to collect, in order.
+    pub params: Vec<String>,
+}
+
+/// Merged snippet store: workspace snippets override global by name.
+#[derive(Debug, Clone)]
+pub struct SnippetStore {
+    global: SnippetLibrary,
+    workspace: SnippetLibrary,
+}
+
+impl SnippetStore {
+    #[must_use]
+    pub fn new(global: SnippetLibrary, workspace: SnippetLibrary) -> Self {
+        Self { global, workspace }
+    }
+
+    /// Resolve a snippet by name. Workspace scope wins over global.
+    #[must_use]
+    pub fn resolve(&self, name: &str) -> Option<&Snippet> {
+        self.workspace
+            .snippets
+            .iter()
+            .find(|s| s.name == name)
+            .or_else(|| self.global.snippets.iter().find(|s| s.name == name))
+    }
+
+    /// All distinct snippet names (workspace + global).
+    #[must_use]
+    pub fn names(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for s in self
+            .workspace
+            .snippets
+            .iter()
+            .chain(self.global.snippets.iter())
+        {
+            if !out.iter().any(|n| n == &s.name) {
+                out.push(s.name.clone());
+            }
+        }
+        out
+    }
+
+    /// Build the parameter prompt for a snippet, or `None` if it does not exist.
+    #[must_use]
+    pub fn prompt_for(&self, name: &str) -> Option<ParamPrompt> {
+        self.resolve(name).map(|s| ParamPrompt {
+            snippet_name: s.name.clone(),
+            params: s.params(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,5 +196,39 @@ mod tests {
             command: "echo ${param:unterminated".to_string(),
         };
         assert!(snip.params().is_empty());
+    }
+
+    #[test]
+    fn store_merges_global_and_workspace_with_workspace_priority() {
+        let global = SnippetLibrary::from_json5(
+            r#"{ snippets: [ { name: "ls", scope: "global", command: "ls -la" } ] }"#,
+        )
+        .unwrap();
+        let workspace = SnippetLibrary::from_json5(
+            r#"{ snippets: [ { name: "ls", scope: "workspace", command: "exa -la" },
+                            { name: "t", scope: "workspace", command: "cargo test" } ] }"#,
+        )
+        .unwrap();
+        let store = SnippetStore::new(global, workspace);
+        assert_eq!(store.resolve("ls").unwrap().command, "exa -la");
+        assert_eq!(store.resolve("t").unwrap().command, "cargo test");
+        assert!(store.resolve("nope").is_none());
+        let mut names = store.names();
+        names.sort();
+        assert_eq!(names, vec!["ls".to_string(), "t".to_string()]);
+    }
+
+    #[test]
+    fn prompt_lists_params_needing_input() {
+        let store = SnippetStore::new(
+            SnippetLibrary { snippets: vec![] },
+            SnippetLibrary::from_json5(
+                r#"{ snippets: [ { name: "d", scope: "workspace", command: "./d ${param:env} ${param:tag}" } ] }"#,
+            )
+            .unwrap(),
+        );
+        let prompt = store.prompt_for("d").expect("snippet exists");
+        assert_eq!(prompt.snippet_name, "d");
+        assert_eq!(prompt.params, vec!["env".to_string(), "tag".to_string()]);
     }
 }
