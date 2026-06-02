@@ -366,9 +366,11 @@ dependencies = [
 name = "bongterm-mcp"
 version = "0.0.0"
 dependencies = [
+ "bongterm-process-control",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "time",
 ]
 
 [[package]]

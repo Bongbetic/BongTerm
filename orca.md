@@ -38,11 +38,11 @@
 | **Phase 1** Usable Terminal | 🔨 **IN PROGRESS** — `ci.yml` green _locally_ on stable 1.95, but GitHub still shows **0 workflow runs as of 2026-06-02**, so the nightly clock has not started. **`1.exit` measurable subset done** (gates #1, #8, #28, #29 fully done + #5-RSS *partial* headless tripwire, built+wired+green locally, commits `b81eaf0`→`2e0947e`). **Remaining = #4, #5 (full RSS+VRAM), #6, #7, #17 — blocked on wiring renderer/mux/ledger into `bongterm-app`** (needs GPU/display + human visual). | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
 | **Phase 2** Agent Observability | ⏸ **LOCAL GREEN / REMOTE EXIT BLOCKED** — all tasks 2.A.0–2.C.3c + 2.D.1 done; gates #15 + #24 re-verified locally on **2026-06-02**; local `nightly.yml` has the checks, but remote `master` still has **no `.github/workflows/nightly.yml`** and GitHub shows **0 workflow runs**, so the required nightly streak is **0/7**. | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
-| **Phase 4** MCP + Secrets + Security | 📋 Planned (23 tasks) | — | §6.1 #16,#19,#23,#31 green + threat-model review |
+| **Phase 4** MCP + Secrets + Security | 🔨 **IN PROGRESS** | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | 📋 Planned (41 tasks) | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Planned (24 tasks) | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-01, live-terminal slice advanced, tree clean)
+### Current status (2026-06-02, phase-4 bootstrap)
 
 Interactive session — the live terminal slice was driven forward in human-verified
 increments (`cargo run -p bongterm-app`, user confirmed each render). Commits
@@ -207,8 +207,7 @@ Gates: spec §6.1 #9, #10, #11, #12, #13, #14.
 
 Gates: spec §6.1 #16, #19, #23, #31.
 
-- 4.A.1 `bongterm-mcp::Supervisor` real impl (1 proc / server / workspace)
-- 4.A.2 JobObject caps via `bongterm-process-control`
+- [next] 4.A.2 JobObject caps via `bongterm-process-control`
 - 4.A.3 MCP manual JSON config import + schema validation
 - 4.A.4 No `npx -y` policy + `forbidden-install-policy` test
 - 4.A.5 Idle shutdown only when no active agent attached

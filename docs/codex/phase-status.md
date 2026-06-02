@@ -1,11 +1,11 @@
-# BongTerm Phase 3 Status
+# BongTerm Phase 4 Status
 
 Source of truth:
 
-- Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
+- Plan: `docs/superpowers/plans/2026-05-29-bongt-phase4.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 fully complete** — exit gate coverage committed and all `3.exit` tests green.
+Current focus: **Phase 4 task 4.A.1 completed** — moving to 4.A.2.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 were re-verified GREEN locally on 2026-06-02, but true phase exit is still blocked remotely because GitHub currently shows 0 workflow runs and remote `master` does not yet contain `.github/workflows/nightly.yml`, so the required x7-nightly streak is still 0/7.
 
@@ -32,3 +32,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 were re-verified G
 | 3.F.1 | Complete | `cargo test -p bongterm-ui devux` (pass, 5 tests); `cargo xtask check-deps` (pass) | Added `bongterm-ui -> bongterm-devassist` edge; implemented `devux` Cmd-K banner, job panel, and clickable region projections over new `CmdKView`, `JobListSnapshot`, and `Span` data shapes. | 3.exit.1 |
 | 3.exit.1 | Complete | `cargo test -p bongterm-app --test phase3_gates` (pass, 7 tests) | Added 3 exit-gate tests for #9 (preview), #10 (explainer), #11 (smart history) with mock/real-claude branches. | 3.exit.2 |
 | 3.exit.2 | Complete | `cargo test -p bongterm-app --test phase3_gates` (pass, 7 tests) | Added 3 exit-gate tests for #12 snippet params, #13 failed-job toast, #14 clickable patterns + OSC8 spoof guard. | 4.A.1 |
+| 4.A.1 | Complete | `cargo test -p bongterm-mcp supervisor::tests::one_process_per_server_per_workspace` (pass, 1 test) | Added `bongterm-mcp::Supervisor` with one-process-per-workspace-and-server registry, duplicate reject, and `server_count` helper. | 4.A.2 |
