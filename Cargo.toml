@@ -50,6 +50,7 @@ arc-swap = "1"
 dashmap = "6"
 schemars = "0.8"
 blake3 = "1"
+regex = "1"
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Security",
@@ -63,6 +64,8 @@ windows = { version = "0.58", features = [
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Direct3D12",
     "Win32_UI_Input_Ime",
+    "UI_Notifications",
+    "Data_Xml_Dom",
 ] }
 rusqlite = { version = "0.32", features = ["bundled", "blob", "backup"] }
 criterion = { version = "0.5", features = ["html_reports"] }

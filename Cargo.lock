@@ -325,6 +325,22 @@ version = "0.0.0"
 [[package]]
 name = "bongterm-devassist"
 version = "0.0.0"
+dependencies = [
+ "bongterm-agents",
+ "bongterm-blocks",
+ "bongterm-storage-api",
+ "bongterm-test-kit",
+ "json5",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+ "windows",
+]
 
 [[package]]
 name = "bongterm-diagnostics"

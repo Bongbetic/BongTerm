@@ -69,7 +69,7 @@ allowed = []
 
 [bongterm-devassist]
 # Cmd-K, explainer, history, snippets, jobs, patterns.
-allowed = ["bongterm-agents", "bongterm-blocks", "bongterm-pty", "bongterm-ledger", "bongterm-storage-api", "bongterm-secrets-api"]
+allowed = ["bongterm-agents", "bongterm-blocks", "bongterm-pty", "bongterm-ledger", "bongterm-storage-api", "bongterm-secrets-api", "bongterm-test-kit"]
 
 [bongterm-diagnostics]
 allowed = ["bongterm-storage-api", "bongterm-security"]

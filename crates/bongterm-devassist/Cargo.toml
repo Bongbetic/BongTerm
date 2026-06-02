@@ -7,5 +7,19 @@ license.workspace = true
 publish = false
 
 [dependencies]
+bongterm-agents = { path = "../bongterm-agents" }
+bongterm-blocks = { path = "../bongterm-blocks" }
+bongterm-storage-api = { path = "../bongterm-storage-api" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+json5 = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+regex = { workspace = true }
+windows = { workspace = true }
 
 [dev-dependencies]
+bongterm-test-kit = { path = "../bongterm-test-kit" }
