@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.C.1 complete** — snippet JSON5 library, scope, and robust parameter parsing.
+Current focus: **Phase 3 task 3.C.2 complete** — snippet parameter substitution before run.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -21,3 +21,4 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.B.3 | Complete | RED: `cargo test -p bongterm-storage-sqlite frecency` failed with unresolved `SqliteFrecencyRepo`. GREEN: `cargo test -p bongterm-storage-sqlite frecency` (pass, 2 tests); `cargo test -p bongterm-storage-sqlite` (pass, 27 tests) | Added `SqliteFrecencyRepo`, idempotent `0002_frecency` table migration, conformance-backed ranking, and use-count update semantics. | 3.B.4 |
 | 3.B.4 | Complete | RED: `cargo test -p bongterm-devassist history::frecency` failed with unresolved `SmartHistory`. GREEN: `cargo test -p bongterm-devassist history::frecency` (pass, 2 tests); `cargo test -p bongterm-devassist` (pass, 21 tests) | Added pure `SmartHistory::search` that parses filters, excludes non-matches, computes frecency from age/use-count metadata, and returns ranked entries. | 3.C.1 |
 | 3.C.1 | Complete | RED: `cargo test -p bongterm-devassist snippets::model` failed with unresolved `Snippet`, `SnippetLibrary`, `SnippetScope`. GREEN: `cargo test -p bongterm-devassist snippets::model` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 25 tests) | Added JSON5 snippet library loading, global/workspace scope enum, robust `${param:name}` extraction, duplicate suppression, malformed JSON parse errors, and malformed-placeholder tolerance. | 3.C.2 |
+| 3.C.2 | Complete | RED: `cargo test -p bongterm-devassist snippets::render` failed with unresolved `render_snippet`. GREEN: `cargo test -p bongterm-devassist snippets::render` (pass, 4 tests); `cargo test -p bongterm-devassist` (pass, 29 tests) | Added single-pass snippet parameter substitution, full missing-param precheck, repeated placeholder replacement, and literal insertion for values containing placeholder syntax. | 3.C.3 |
