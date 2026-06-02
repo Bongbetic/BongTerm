@@ -1,18 +1,19 @@
 //! Recording mock for `bongterm_devassist::jobs::Notifier`.
 
 use bongterm_devassist::jobs::{Notifier, Toast};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Records every toast for assertions.
+#[derive(Clone)]
 pub struct MockNotifier {
-    toasts: Mutex<Vec<Toast>>,
+    toasts: Arc<Mutex<Vec<Toast>>>,
 }
 
 impl MockNotifier {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            toasts: Mutex::new(Vec::new()),
+            toasts: Arc::new(Mutex::new(Vec::new())),
         }
     }
 

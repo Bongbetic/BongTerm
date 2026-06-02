@@ -5,7 +5,7 @@ Source of truth:
 - Plan: `docs/superpowers/plans/2026-05-29-bongt-phase3.md`
 - Execution rules: `AGENTS.md`
 
-Current focus: **Phase 3 task 3.F.1 complete** — DevUX view-models: Cmd-K banner, job panel rows, clickable regions.
+Current focus: **Phase 3 fully complete** — exit gate coverage committed and all `3.exit` tests green.
 
 Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally and wired into nightly. Operational/future requirement remains green x7 nightlies.
 
@@ -30,3 +30,5 @@ Phase 2 handoff: all code tasks are complete; gates #15 + #24 are GREEN locally 
 | 3.E.2 | Complete | RED: plan command `cargo test -p bongterm-devassist patterns::matchers overlay` was invalid on current Cargo; valid filter `cargo test -p bongterm-devassist overlay` failed with unresolved `LineRef` and `ClickableOverlay`. GREEN: `cargo test -p bongterm-devassist overlay` (pass, 1 test); `cargo test -p bongterm-devassist patterns::matchers` (pass, 7 tests); `cargo test -p bongterm-devassist` (pass, 47 tests) | Added read-only `LineRef`, `OverlaySpan`, and `ClickableOverlay` that collect per-row spans without mutating line text. | 3.E.3 |
 | 3.E.3 | Complete | RED: `cargo test -p bongterm-devassist patterns::url` failed with unresolved `scan_urls`, `parse_osc8`, `Osc8Link`, `LinkKind`, and `verify_destination`. GREEN: `cargo test -p bongterm-devassist patterns::url` (pass, 5 tests); `cargo test -p bongterm-devassist` (pass, 52 tests) | Added bare http(s) URL scanning, OSC 8 URI/text parsing, host-mismatch spoof detection, and non-http(s) destination rejection. | 3.F.1 |
 | 3.F.1 | Complete | `cargo test -p bongterm-ui devux` (pass, 5 tests); `cargo xtask check-deps` (pass) | Added `bongterm-ui -> bongterm-devassist` edge; implemented `devux` Cmd-K banner, job panel, and clickable region projections over new `CmdKView`, `JobListSnapshot`, and `Span` data shapes. | 3.exit.1 |
+| 3.exit.1 | Complete | `cargo test -p bongterm-app --test phase3_gates` (pass, 7 tests) | Added 3 exit-gate tests for #9 (preview), #10 (explainer), #11 (smart history) with mock/real-claude branches. | 3.exit.2 |
+| 3.exit.2 | Complete | `cargo test -p bongterm-app --test phase3_gates` (pass, 7 tests) | Added 3 exit-gate tests for #12 snippet params, #13 failed-job toast, #14 clickable patterns + OSC8 spoof guard. | 4.A.1 |

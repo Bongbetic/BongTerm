@@ -27,6 +27,9 @@ dogfood/private/
 chunks/
 secrets/*.json
 !secrets/.gitkeep
+vendor/wezterm/
+.codegraph/
+.repograph/
 
 # Build artifacts
 target/

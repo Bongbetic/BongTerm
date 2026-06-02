@@ -4,6 +4,7 @@
 //! Execution is gated behind `super::cmdk::CmdKSession::confirm_run`.
 
 use crate::DevassistError;
+use std::process::Command;
 
 /// What the caller wants the AI to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +119,26 @@ impl ClaudeCodeAiRunner {
     #[must_use]
     pub fn new(info: ClaudeInfo) -> Self {
         Self { info }
+    }
+
+    /// Discover a local `claude` binary and read its version.
+    pub fn discover() -> Result<Self, DevassistError> {
+        let output = Command::new("claude")
+            .arg("--version")
+            .output()
+            .map_err(|error| {
+                DevassistError::Backend(format!("unable to run `claude --version`: {error}"))
+            })?;
+        if !output.status.success() {
+            return Err(DevassistError::Unavailable(
+                "Claude Code not installed".to_string(),
+            ));
+        }
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(Self::new(ClaudeInfo {
+            binary: "claude".to_string(),
+            version,
+        }))
     }
 
     /// Parse `claude --print --output-format json` stdout.

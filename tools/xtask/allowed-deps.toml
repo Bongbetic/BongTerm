@@ -12,7 +12,7 @@ allowed = [
     "bongterm-ledger", "bongterm-process-control", "bongterm-secrets-api",
     "bongterm-vault-windows", "bongterm-security", "bongterm-storage-api",
     "bongterm-storage-sqlite", "bongterm-settings", "bongterm-devassist",
-    "bongterm-diagnostics",
+    "bongterm-diagnostics", "bongterm-test-kit",
 ]
 
 [bongterm-ui]

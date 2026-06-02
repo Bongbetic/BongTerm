@@ -224,7 +224,8 @@ pub struct FrecencyRow {
 /// Combined recency + frequency score. Higher is more relevant.
 ///
 /// Frequency contributes logarithmically; recency decays with elapsed time.
-/// Pure function so the SQLite impl and the mock rank identically.
+/// Pure function so the `SQLite` impl and the mock rank identically.
+#[allow(clippy::doc_markdown, clippy::cast_precision_loss)]
 #[must_use]
 pub fn frecency_score(row: &FrecencyRow, now_unix: i64) -> f64 {
     let frequency = (1.0 + row.use_count as f64).ln();

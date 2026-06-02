@@ -3,6 +3,8 @@
 //! Jobs run in a background pane off the hot path. On terminal state the runner
 //! emits a desktop toast via the [`Notifier`] port. The real implementation
 //! wraps WinRT notifications; tests use a recording mock.
+use crate::DevassistError;
+use tokio::process::Command;
 
 /// Unique identifier for a background job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -16,6 +18,20 @@ pub struct JobSpec {
     pub command: String,
     pub args: Vec<String>,
     pub cwd: Option<String>,
+}
+
+impl JobSpec {
+    /// Build a shell-style specification from a command name and arguments.
+    #[must_use]
+    pub fn shell(label: &str, command: &str, args: &[&str]) -> Self {
+        Self {
+            id: JobId(uuid::Uuid::new_v4()),
+            label: label.to_string(),
+            command: command.to_string(),
+            args: args.iter().map(ToString::to_string).collect(),
+            cwd: None,
+        }
+    }
 }
 
 /// Lifecycle state of a background job. Closed set means exhaustive matches.
@@ -124,6 +140,29 @@ impl<'n> JobRunner<'n> {
         Self { notifier }
     }
 
+    /// Build a `JobSpec` from fields, run it, and await completion.
+    pub async fn run_to_completion(&self, spec: JobSpec) -> Result<JobCompletion, DevassistError> {
+        let mut command = Command::new(&spec.command);
+        command.args(&spec.args);
+        if let Some(cwd) = &spec.cwd {
+            command.current_dir(cwd);
+        }
+
+        let status = command
+            .status()
+            .await
+            .map_err(|err| DevassistError::Backend(format!("spawn job: {err}")))?;
+
+        let exit_code = status.code().unwrap_or(-1);
+        let final_state = self.finish(
+            &spec,
+            JobOutcome::Exited {
+                code: exit_code as i64,
+            },
+        );
+        Ok(JobCompletion { final_state })
+    }
+
     /// Map an outcome to a terminal [`JobState`], emit the matching toast, and
     /// return the final state.
     pub fn finish(&self, spec: &JobSpec, outcome: JobOutcome) -> JobState {
@@ -137,6 +176,12 @@ impl<'n> JobRunner<'n> {
         self.notifier.notify(&toast);
         state
     }
+}
+
+/// Result of running a concrete job process to completion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobCompletion {
+    pub final_state: JobState,
 }
 
 #[cfg(test)]
@@ -168,5 +213,4 @@ mod tests {
         assert_eq!(bad.kind, ToastKind::Failure);
         assert!(bad.body.contains("failed"));
     }
-
 }

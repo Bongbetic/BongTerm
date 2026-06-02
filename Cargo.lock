@@ -308,14 +308,19 @@ name = "bongterm-app"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bongterm-devassist",
  "bongterm-diagnostics",
  "bongterm-ledger",
  "bongterm-pty",
  "bongterm-render",
+ "bongterm-storage-api",
  "bongterm-term",
+ "bongterm-test-kit",
  "bongterm-ui",
  "iced",
+ "time",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

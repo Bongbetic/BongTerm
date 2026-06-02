@@ -22,3 +22,9 @@ tokio = { workspace = true }
 [dev-dependencies]
 # Gate #5 (RSS): exercise the real resource sampler against a live session.
 bongterm-ledger = { path = "../bongterm-ledger" }
+bongterm-devassist = { path = "../bongterm-devassist" }
+bongterm-test-kit = { path = "../bongterm-test-kit" }
+time = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+bongterm-storage-api = { path = "../bongterm-storage-api" }

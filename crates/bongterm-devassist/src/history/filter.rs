@@ -99,6 +99,18 @@ impl HistoryQuery {
             .map(|(_, value)| value.as_str())
     }
 
+    /// Whether any filter token was parsed.
+    #[must_use]
+    pub fn has_filter(&self) -> bool {
+        !self.filters.is_empty()
+    }
+
+    /// The free text to match against command text.
+    #[must_use]
+    pub fn free_text(&self) -> &str {
+        &self.free_text
+    }
+
     /// Whether an entry satisfies all filters and free text.
     #[must_use]
     pub fn matches(&self, entry: &HistoryEntryMeta) -> bool {
