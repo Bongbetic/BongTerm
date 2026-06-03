@@ -56,7 +56,7 @@ cargo xtask site-check site
 | Phase 5 clean-VM signed install smoke complete | blocked | External VM/signing proof required. |
 | Trademark search accepted | pending | `docs/adr/0009-trademark-search.md` |
 | Product-name ADR accepted | pending | `docs/adr/0002-product-name.md` |
-| SECURITY inbox real and monitored | blocked | `SECURITY.md` |
+| SECURITY inbox real and monitored | pass | GitHub private vulnerability reporting URL in `SECURITY.md`; owner/cadence recorded. |
 | Release artifact set verified | pending | `cargo xtask release-verify dist` needs real signed `dist/`. |
 | Landing page checked | pass | `cargo xtask site-check site` passed locally on 2026-06-03. |
 

@@ -23,6 +23,7 @@ Phase 6 prep: `docs/dogfood/README.md`, `docs/dogfood/_template.md`, and `docs/d
 Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-flip/community docs, install/privacy docs, static landing page, and xtask `checksums`, `release-verify`, and `site-check` subcommands. Local xtask tests are green.
 
 Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
+Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`), which starts PR CI. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. A dev-signed MSIX smoke artifact exists under `target/msix/` with public cert `target/msix/BongTerm-Dev.cer`.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
@@ -36,4 +37,4 @@ Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` 
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
 | Workspace gates | Green | `cargo fmt --all -- --check` (pass); `cargo clippy --all-targets --all-features --workspace -- -D warnings` (pass); `cargo test --workspace` (pass); `cargo xtask check-deps` (pass) | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
 
-Next task: Phase 6 `6.A.1` is blocked until external Phase 5 clean-VM smoke and remote-nightly proof are accepted or completed. Legal/trademark ADRs, real SECURITY inbox, signed `dist/`, Stage A/B dogfood, public flip, and GitHub release remain incomplete.
+Next task: begin local testing from PR #1 and dev-signed MSIX smoke. Phase 6 public-release exit remains blocked until external Phase 5 clean-VM smoke, 7 remote nightlies, legal/trademark ADRs, signed release `dist/`, Stage A/B dogfood, public flip, and GitHub release complete.

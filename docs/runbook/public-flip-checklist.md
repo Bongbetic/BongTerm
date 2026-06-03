@@ -13,8 +13,8 @@ status: blocked
 | Issue templates present | pass | `.github/ISSUE_TEMPLATE/` |
 | PR template present | pass | `.github/PULL_REQUEST_TEMPLATE.md` |
 | PRIVACY present | pass | `PRIVACY.md` |
-| SECURITY inbox real and monitored | blocked | `SECURITY.md` still needs real address/owner. |
-| No PLACEHOLDER tokens repo-wide | blocked | Real security inbox required first. |
+| SECURITY inbox real and monitored | pass | GitHub private vulnerability reporting URL in `SECURITY.md`; owner/cadence recorded. |
+| No unresolved placeholders in active release docs | pass | `SECURITY.md`, `README.md`, `INSTALL.md`, and release runbook use concrete public handles. Historical planning docs may still quote old placeholder examples. |
 | No committed secrets in repo/history | pending | Run full-history scan before flip. |
 | All P0 gates green for 7 consecutive nightlies | blocked | Remote proof not complete. |
 | Phase 5 clean-VM signed install smoke complete | blocked | External VM/signing proof required. |

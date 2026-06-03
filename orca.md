@@ -62,6 +62,13 @@ public-flip/community docs, install/privacy docs, static landing page, and xtask
 tooling tests are green, but signed `dist/`, trademark/legal decision, real
 SECURITY inbox, dogfood, public flip, and GitHub release are not complete.
 
+Testing unblock update: branch `codex/phase5-hardening-closeout` was pushed over
+SSH and PR #1 was opened. `SECURITY.md` now uses GitHub private vulnerability
+reporting instead of a placeholder inbox. A dev-signed MSIX smoke artifact exists
+at `target/msix/BongTerm.msix` with public cert `target/msix/BongTerm-Dev.cer`.
+This enables local/tester smoke, but it is not an OV-signed public release
+artifact and does not satisfy clean-VM public-release proof.
+
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
 #7 split/focus cycle, and #17 registered pane-process attribution are green locally.
@@ -87,9 +94,11 @@ Latest local verification:
 
 ### Next actionables (priority order)
 
-1. **External CI proof** — push/PR branch `codex/phase5-hardening-closeout` and wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
-2. **Manual Phase 5 release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-3. **Phase 6 start** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
+1. **PR CI proof** — monitor PR #1 until CI is green.
+2. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
+3. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+4. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
+5. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 

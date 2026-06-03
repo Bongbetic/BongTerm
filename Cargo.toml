@@ -29,7 +29,7 @@ members = [
 edition = "2024"
 rust-version = "1.95"
 license = "Apache-2.0"
-repository = "https://github.com/PLACEHOLDER-USER/bongterm"
+repository = "https://github.com/soubarnak/BongTerm"
 authors = ["BongTerm contributors"]
 
 [workspace.dependencies]

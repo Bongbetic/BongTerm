@@ -9,10 +9,11 @@
 
 ## Reporting a Vulnerability
 
-Email: security@PLACEHOLDER-DOMAIN (blocked; set before public flip).
+Use GitHub private vulnerability reporting for this repository:
+`https://github.com/soubarnak/BongTerm/security/advisories/new`.
 
 Please do not open public GitHub issues for vulnerabilities.
 
 We aim to acknowledge reports within 5 working days.
 
-Before the repository is made public, replace the placeholder address with a real monitored inbox, name the monitoring owner, and record the check cadence in `docs/runbook/public-flip-checklist.md`.
+Maintainer monitoring owner: Soubarna Karmakar. Check cadence before public release: every working day.
