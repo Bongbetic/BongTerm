@@ -56,6 +56,12 @@ are accepted or completed. Attempted push of `codex/phase5-hardening-closeout`
 was rejected because the GitHub OAuth token lacks `workflow` scope for changed
 `.github/workflows/*.yml` files.
 
+Additional Phase 6 local prep is present: Stage B plan/summary skeletons,
+public-flip/community docs, install/privacy docs, static landing page, and xtask
+`checksums`, `release-verify`, and `site-check` subcommands. Local Phase 6
+tooling tests are green, but signed `dist/`, trademark/legal decision, real
+SECURITY inbox, dogfood, public flip, and GitHub release are not complete.
+
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
 #7 split/focus cycle, and #17 registered pane-process attribution are green locally.

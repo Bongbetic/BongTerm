@@ -20,6 +20,8 @@ Phase 5 exit closure: local code/doc/tooling gates are green and committed. The 
 
 Phase 6 prep: `docs/dogfood/README.md`, `docs/dogfood/_template.md`, and `docs/dogfood/stage-a-summary.md` now exist for 6.A.0. Stage A dogfood has **not** started.
 
+Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-flip/community docs, install/privacy docs, static landing page, and xtask `checksums`, `release-verify`, and `site-check` subcommands. Local xtask tests are green.
+
 Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
 
 | Area | Status | Last test run | Notes/blockers |
@@ -34,4 +36,4 @@ Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` 
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
 | Workspace gates | Green | `cargo fmt --all -- --check` (pass); `cargo clippy --all-targets --all-features --workspace -- -D warnings` (pass); `cargo test --workspace` (pass); `cargo xtask check-deps` (pass) | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
 
-Next task: Phase 6 `6.A.1` is blocked until external Phase 5 clean-VM smoke and remote-nightly proof are accepted or completed.
+Next task: Phase 6 `6.A.1` is blocked until external Phase 5 clean-VM smoke and remote-nightly proof are accepted or completed. Legal/trademark ADRs, real SECURITY inbox, signed `dist/`, Stage A/B dogfood, public flip, and GitHub release remain incomplete.

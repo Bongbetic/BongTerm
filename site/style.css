@@ -1,0 +1,77 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #101215;
+  color: #f3f5f7;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  min-height: 100vh;
+}
+
+.hero {
+  padding: 88px 8vw 56px;
+  background: #15191e;
+}
+
+.eyebrow {
+  color: #71d0a8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(3rem, 8vw, 6rem);
+  letter-spacing: 0;
+}
+
+.lede {
+  max-width: 720px;
+  font-size: 1.25rem;
+  line-height: 1.5;
+  color: #c8d0d8;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.actions a {
+  color: #101215;
+  background: #71d0a8;
+  padding: 10px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  background: #303741;
+}
+
+article {
+  min-height: 150px;
+  padding: 28px;
+  background: #101215;
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+p {
+  line-height: 1.55;
+}
