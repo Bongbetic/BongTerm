@@ -8,6 +8,11 @@ publish = false
 
 [dependencies]
 bongterm-settings = { path = "../bongterm-settings" }
+bongterm-devassist = { path = "../bongterm-devassist" }
+bongterm-render = { path = "../bongterm-render" }
 iced = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }
 
 [dev-dependencies]

@@ -210,6 +210,40 @@ pub trait MigrationRunner: Send + Sync + 'static {
 }
 
 // ---------------------------------------------------------------------------
+// Frecency (smart-history ranking)
+// ---------------------------------------------------------------------------
+
+/// A frecency record for one command string.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FrecencyRow {
+    pub command: String,
+    pub use_count: u64,
+    pub last_used_unix: i64,
+}
+
+/// Combined recency + frequency score. Higher is more relevant.
+///
+/// Frequency contributes logarithmically; recency decays with elapsed time.
+/// Pure function so the `SQLite` impl and the mock rank identically.
+#[allow(clippy::doc_markdown, clippy::cast_precision_loss)]
+#[must_use]
+pub fn frecency_score(row: &FrecencyRow, now_unix: i64) -> f64 {
+    let frequency = (1.0 + row.use_count as f64).ln();
+    let age_secs = (now_unix - row.last_used_unix).max(0) as f64;
+    let recency = 0.5_f64.powf(age_secs / 86_400.0);
+    frequency * (0.5 + recency)
+}
+
+/// Record command uses and retrieve frecency-ranked history.
+pub trait FrecencyRepo: Send + Sync + 'static {
+    /// Record one use of `command` at `at_unix` (seconds since epoch).
+    fn record_use(&self, command: &str, at_unix: i64) -> Result<(), StorageError>;
+
+    /// Return the top `n` commands by frecency score as of `now_unix`.
+    fn top_n(&self, n: usize, now_unix: i64) -> Result<Vec<FrecencyRow>, StorageError>;
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

@@ -1,28 +1,87 @@
-# BongTerm Phase 2 Status
+# BongTerm Runtime Correction Status
 
 Source of truth:
 
-- Plan: `docs/superpowers/plans/2026-05-29-bongt-phase2.md`
-- Execution rules: `AGENTS.md`
+- Plan: `docs/superpowers/plans/2026-05-28-bongt-phase1.md`
+- Product intent: `docs/PRD/bongterm_prd_v7.md`
+- Execution control plane: `orca.md`
 
-Current focus: `2.C.1`
+Current focus: **Release pipeline mode active; Phase 1 runtime correction and
+UI follow-up locally complete; release proof unblock next** on 2026-06-11.
 
-| Task ID | Status | Last test run | Notes/blockers | Next task |
-| --- | --- | --- | --- | --- |
-| 2.A.0 | Complete | `cargo test -p bongterm-agents summarize_exit` (pass, 1 test) | `cargo fmt --all -- --check` fails from unrelated pre-existing workspace formatting diffs | 2.A.2 |
-| 2.A.2 | Complete | `cargo test -p bongterm-agents discover::` (pass, 3 tests) | RED observed first (`BinaryDiscovery`/`parse_version_line` missing), then GREEN after implementing `discover.rs` | 2.A.3 |
-| 2.A.3 | Complete | `cargo test -p bongterm-agents classify::` (pass, 3 tests) | RED observed first (`LineBuffer`/`is_suspected_injection`/`classify_claude_line` missing), then GREEN after implementing shared `classify.rs` line-buffer + injection heuristics + Claude JSON classification | 2.A.4 |
-| 2.A.4 | Complete | `cargo test -p bongterm-agents claude_code::` (pass, 4 tests) | RED observed first (`ClaudeCodeAdapter` missing), then GREEN after implementing `claude_code.rs` with shared `classify.rs` core, injectable discovery path, and stateful stream-json classifier | 2.A.5 |
-| 2.A.5 | Complete | `cargo test -p bongterm-agents codex_cli::` (pass, 3 tests) | RED step initially showed 0 tests because `codex_cli.rs` was still placeholder; then GREEN after implementing `codex_cli.rs` (`CodexCliAdapter` + `CodexCliClassifier`) with shared `classify.rs` core | 2.A.6 |
-| 2.A.6 | Complete | `cargo test -p bongterm-agents --test conformance` (pass, 2 tests) | RED observed first (`--test conformance` missing target), then GREEN after adding `conformance.rs` + extending `agent_adapter_conformance::run_offline`; required `cargo xtask check-deps` failed on unrelated pre-existing violation `bongterm-storage-sqlite -> bongterm-test-kit` | 2.B.1 |
-| 2.B.1 | Complete | `cargo test -p bongterm-agents transcript::` (pass, 2 tests) | RED observed first (`TranscriptSink` missing; tests failed to compile), then GREEN after implementing `transcript.rs` `TranscriptSink` over `TranscriptRepo` with monotonic chunk indexing and paused-on-error backpressure behavior | 2.B.2 |
-| 2.B.2 | Complete | `cargo test -p bongterm-agents file_change::` (pass, 4 tests) | RED observed first (`parse_porcelain_v1`/`ChangeStatus`/`GitPorcelainTracker` missing), then GREEN after implementing `file_change.rs` porcelain-v1 parser + snapshot diff attribution + injectable git runner | 2.B.3 |
-| 2.B.3 | Complete | `cargo test -p bongterm-agents approval::` (pass, 4 tests) | RED observed first (`ApprovalQueue`/`ApprovalDecision`/`ApprovalState` missing), then GREEN after implementing `approval.rs` policy-routed `ApprovalQueue` with explicit `EnforcementLevel` labels and deny-never-approvable resolution rule | 2.B.4 |
-| 2.B.4 | Complete | `cargo test -p bongterm-agents replay_` (pass, 4 tests) | RED observed first (`ReplayBuilder` missing), then GREEN after implementing `replay.rs` `ReplayBuilder` + `ReplaySpec` prefilled summary context replay | 2.C.2a |
-| 2.C.2a | Complete | `cargo test -p bongterm-agents lifecycle::` (pass, 7 tests) | Previously blocked by missing `ReplayBuilder` in `replay.rs`; rerun after replay implementation sync is GREEN | 2.C.1 |
-| 2.C.1 | Complete | `cargo test -p bongterm-ui agent_sidebar::` (pass, 5 tests) | RED observed first (missing `ShellMessage::{AgentLifecycle,AgentInterrupt,ApprovalResolve}`), then GREEN after adding UI message variants + no-op update arms; required `cargo xtask check-deps` still fails on pre-existing unrelated violation `bongterm-storage-sqlite -> bongterm-test-kit` | 2.C.3a |
-| 2.C.3a | Not started | Not run | - | 2.C.3b |
-| 2.C.3b | Not started | Not run | - | 2.C.3c |
-| 2.C.3c | Not started | Not run | - | 2.D.1 |
-| 2.D.1 | Not started | Not run | - | 2.EXIT |
-| 2.EXIT | Not started | Not run | - | - |
+Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
+chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
+release pipeline mode: continue sequential planned tasks in one session only
+after each task has its RED/GREEN checks, required verification, status updates,
+and blocker assessment. This does not relax external/manual release gates.
+
+Completed tasks: `1.R.1`, `1.R.2`, and `1.R.3` runtime correction. The running
+binary composes `bongterm-ui` shell chrome with the existing live terminal
+runtime, renders `AgentSidebarVm::view()` in the agent panel, renders a UI-local
+resource dashboard DTO translated from `bongterm-ledger::DashboardViewModel`,
+and routes composed-app resize through shell-owned center-pane surface sizing
+before resizing terminal PTY/parser/grid state.
+
+UI follow-up complete: the terminal shader now renders text in widget-local
+coordinates for composed shell layouts, the resource dashboard splits category
+and metrics lines to avoid side-panel overlap, and the current-process CPU
+sampler establishes a first-sample baseline at `0.0%`. Manual wide visual smoke
+captured `C:\Users\souba\AppData\Local\Temp\bongterm-ui-smoke-wide-26320.png`
+with center-pane terminal alignment and readable resource metrics.
+
+Next task: release proof unblock — inspect default/local workflow state, add or
+repair tag-gated release workflow support if missing, and prepare the push/merge
+path required to start remote nightly/release proof.
+
+Last verification:
+
+- RED: `cargo test -p bongterm-app --test shell_app` failed with missing `terminal_surface_size_for_window` and `AppMessage::WindowResized` for `1.R.3`.
+- GREEN: `cargo test -p bongterm-app --test shell_app` — pass, 3 tests.
+- UI RED/GREEN follow-up targets: `cargo test -p bongterm-render shader_text_layout_uses_widget_local_origin`, `cargo test -p bongterm-ui resource_row_separates_title_from_metrics`, and `cargo test -p bongterm-ledger current_process_sampler_first_sample_sets_cpu_baseline` — each failed before implementation and passed after.
+- `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app` — pass.
+- `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings` — pass; vendored wezterm warnings still print from dependencies.
+- `cargo fmt --all -- --check` — pass; stable rustfmt still prints existing nightly-only config warnings.
+- `git diff --check` — pass.
+- `cargo test --workspace --quiet` — pass.
+- Manual resize smoke: `target\debug\bongterm-app.exe` opened responding PID `26696`, title `BongTerm - workspace`; Win32 resize to `900x600` and `1200x720` left the process responsive.
+- Manual wide visual smoke: `target\debug\bongterm-app.exe` opened `BongTerm - workspace`; screenshot `C:\Users\souba\AppData\Local\Temp\bongterm-ui-smoke-wide-26320.png` showed center-pane terminal alignment and non-overlapping resource metrics.
+
+Commit: `d221e06 feat(phase5): close hardening release prep`
+
+Branch: `codex/phase5-hardening-closeout`
+
+Phase 1 exit closure: local gates #1,#4-8,#17,#28,#29 are green and runtime
+correction is locally complete through `1.R.3`. The remote exit proof is still
+the required 7 consecutive remote nightlies.
+
+Phase 2 exit closure: local gates #15 and #24 are green and wired into nightly. The remaining Phase 2 exit proof is the required 7 consecutive remote nightlies.
+
+Phase 5 exit closure: local code/doc/tooling gates are green and committed. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing toolchain/cert.
+
+Phase 6 prep: `docs/dogfood/README.md`, `docs/dogfood/_template.md`, and `docs/dogfood/stage-a-summary.md` now exist for 6.A.0. Stage A dogfood has **not** started.
+
+Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-flip/community docs, install/privacy docs, static landing page, and xtask `checksums`, `release-verify`, and `site-check` subcommands. Local xtask tests are green.
+
+Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
+Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`). PR #1 `correctness` run `27318475490` passed on 2026-06-11 after commit `2cc345a fix(app): keep startup off font probing`; the prior Gate #4 CI failure was fixed by removing synchronous font probing from app boot. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. A dev-signed MSIX smoke artifact exists under `target/msix/` with public cert `target/msix/BongTerm-Dev.cer`.
+Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now skips only that runner-specific empty-stream condition on GitHub Actions; local/reference machines still require Windows PowerShell coverage.
+
+| Area | Status | Last test run | Notes/blockers |
+| --- | --- | --- | --- |
+| Phase 1 exit gates | Local green | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests) | Remote 7-nightly proof still external/time-bound. |
+| UIA/accessibility | Local green | `cargo test -p bongterm-ui` (pass); `cargo test -p bongterm-test-kit` (pass) | Manual Narrator QA documented in `tests/accessibility/narrator_smoke.md`. |
+| IME + DPI | Local green | `cargo test -p bongterm-ui` (pass) | Live CJK IME QA remains manual. |
+| Renderer device loss | Local green | `cargo test -p bongterm-render device_loss` (pass) | Recovery policy falls back to software after repeated loss. |
+| Diagnostics/export/minidump/recovery | Local green | `cargo test -p bongterm-diagnostics` (pass) | Telemetry remains off by default; export bundle uses redaction preview. |
+| Forbidden abstraction/EDR | Local green | `cargo test -p bongterm-security forbidden` (pass); `cargo run -p xtask -- forbidden-abstraction` (pass) | Runtime auditor and static scan are present; external Defender/EDR smoke is documented. |
+| Release packaging | Local green | `cargo run -p xtask -- package-msix` (pass) | `makeappx.exe`/real signing cert/clean VM not available in this local proof. |
+| SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
+| Workspace gates | Green | PR #1 `correctness` run `27318475490` (pass); local follow-up checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app`, `cargo test --workspace --quiet` | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
+
+Next task: release proof unblock is actionable locally. `6.A.1` remains blocked
+and not executable until Phase 5 clean-VM signed install smoke proof and 7
+consecutive remote nightly CI green runs are accepted or completed (last checked
+2026-06-11T07:56:30+05:30). Phase 6 public-release exit remains blocked until
+external Phase 5 clean-VM smoke, 7 remote nightlies, legal/trademark ADRs,
+signed release `dist/`, Stage A/B dogfood, public flip, and GitHub release
+complete.

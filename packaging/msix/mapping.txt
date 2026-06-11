@@ -1,0 +1,3 @@
+[Files]
+"target\release\bongterm-app.exe" "BongTerm.exe"
+"packaging\msix\AppxManifest.xml" "AppxManifest.xml"

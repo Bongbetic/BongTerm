@@ -7,5 +7,10 @@ license.workspace = true
 publish = false
 
 [dependencies]
+bongterm-secrets-api = { path = "../bongterm-secrets-api" }
+thiserror = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true }
 
 [dev-dependencies]

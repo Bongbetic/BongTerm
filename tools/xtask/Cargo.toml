@@ -8,10 +8,12 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+bongterm-security = { path = "../../crates/bongterm-security" }
 camino = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.10"
 toml = "0.8"
 walkdir = "2"
 cargo_metadata = "0.18"

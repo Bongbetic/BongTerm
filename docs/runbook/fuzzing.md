@@ -15,10 +15,7 @@ Fuzzing uses `cargo-fuzz`, which requires nightly Rust. This is the **only** per
 
 | Target | Crate | What it fuzzes |
 |---|---|---|
-| `fuzz_vt_parser` | `bongterm-term` | VT/ANSI/OSC parser over arbitrary byte streams |
-| `fuzz_osc_consumer` | `bongterm-blocks` | OSC sequence consumer |
-| `fuzz_settings_json5` | `bongterm-settings` | JSON5 settings deserialization |
-| `fuzz_redactor` | `bongterm-security` | Redaction regex corpus |
+| `vt_parser` | `bongterm-term` | VT/ANSI/OSC parser over arbitrary byte streams |
 
 ## Bumping the nightly pin
 
@@ -36,7 +33,7 @@ cd tools/xtask/fuzz
 cargo +nightly install cargo-fuzz --locked
 
 # Run a target for N seconds
-cargo +nightly fuzz run fuzz_vt_parser -- -max_total_time=60
+cargo +nightly fuzz run vt_parser -- -max_total_time=60
 ```
 
 ## Corpus management

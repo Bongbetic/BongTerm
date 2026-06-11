@@ -6,8 +6,8 @@
 //! until **both** consumers have released their reference.
 
 use crate::ring::Slab;
-use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 
 /// Fans out a [`PtyReaderTask`] byte stream to two downstream consumers.
@@ -39,15 +39,19 @@ impl PtyDispatcher {
                 }
             }
         });
-        Self { rx_a, rx_b, _handle: handle }
+        Self {
+            rx_a,
+            rx_b,
+            _handle: handle,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ring::SlabPool;
     use crate::reader::PtyReaderTask;
+    use crate::ring::SlabPool;
     use std::io::Cursor;
 
     #[test]
@@ -67,7 +71,9 @@ mod tests {
     #[test]
     fn dispatcher_slow_renderer_no_byte_loss() {
         // rx_a capacity=1 simulates heavy backpressure on the renderer path.
-        let data: Vec<u8> = (0u64..8192 * 4).map(|i| (i % 256) as u8).collect();
+        let data: Vec<u8> = (0u64..8192 * 4)
+            .map(|i| u8::try_from(i % 256).unwrap())
+            .collect();
         let cursor = Cursor::new(data.clone());
         let pool = SlabPool::new(4);
         let reader = PtyReaderTask::spawn(Box::new(cursor), pool, 2);
@@ -88,15 +94,25 @@ mod tests {
             renderer_received.extend_from_slice(slab.slice());
         }
 
-        let transcript_received = transcript_thread.join().expect("transcript thread panicked");
-        assert_eq!(renderer_received, data, "renderer lost bytes under backpressure");
-        assert_eq!(transcript_received, data, "transcript lost bytes under backpressure");
+        let transcript_received = transcript_thread
+            .join()
+            .expect("transcript thread panicked");
+        assert_eq!(
+            renderer_received, data,
+            "renderer lost bytes under backpressure"
+        );
+        assert_eq!(
+            transcript_received, data,
+            "transcript lost bytes under backpressure"
+        );
     }
 
     #[test]
     fn dispatcher_slow_transcript_no_byte_loss() {
         // rx_b capacity=1 simulates heavy backpressure on the transcript path.
-        let data: Vec<u8> = (0u64..8192 * 4).map(|i| (i % 256) as u8).collect();
+        let data: Vec<u8> = (0u64..8192 * 4)
+            .map(|i| u8::try_from(i % 256).unwrap())
+            .collect();
         let cursor = Cursor::new(data.clone());
         let pool = SlabPool::new(4);
         let reader = PtyReaderTask::spawn(Box::new(cursor), pool, 2);
@@ -118,8 +134,14 @@ mod tests {
         }
 
         let renderer_received = renderer_thread.join().expect("renderer thread panicked");
-        assert_eq!(renderer_received, data, "renderer lost bytes under backpressure");
-        assert_eq!(transcript_received, data, "transcript lost bytes under backpressure");
+        assert_eq!(
+            renderer_received, data,
+            "renderer lost bytes under backpressure"
+        );
+        assert_eq!(
+            transcript_received, data,
+            "transcript lost bytes under backpressure"
+        );
     }
 
     #[test]
@@ -129,9 +151,21 @@ mod tests {
         let reader = PtyReaderTask::spawn(Box::new(cursor), pool, 4);
         let dispatcher = PtyDispatcher::spawn(reader.rx, 4, 4);
 
-        dispatcher.rx_a.recv().expect("rx_a should receive first slab");
-        dispatcher.rx_b.recv().expect("rx_b should receive first slab");
-        assert!(dispatcher.rx_a.recv().is_err(), "rx_a should close after PTY EOF");
-        assert!(dispatcher.rx_b.recv().is_err(), "rx_b should close after PTY EOF");
+        dispatcher
+            .rx_a
+            .recv()
+            .expect("rx_a should receive first slab");
+        dispatcher
+            .rx_b
+            .recv()
+            .expect("rx_b should receive first slab");
+        assert!(
+            dispatcher.rx_a.recv().is_err(),
+            "rx_a should close after PTY EOF"
+        );
+        assert!(
+            dispatcher.rx_b.recv().is_err(),
+            "rx_b should close after PTY EOF"
+        );
     }
 }

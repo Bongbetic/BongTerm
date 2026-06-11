@@ -3,10 +3,13 @@
 //! See `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` §1.2 for the
 //! ownership matrix entry that governs what this crate may and may not own.
 
-#![deny(unsafe_code)]
+#![cfg_attr(not(windows), deny(unsafe_code))]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
+
+#[cfg(windows)]
+pub mod job;
 
 /// Resource limits enforced via Windows Job Objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

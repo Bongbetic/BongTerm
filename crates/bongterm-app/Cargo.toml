@@ -8,4 +8,23 @@ publish = false
 
 [dependencies]
 bongterm-diagnostics = { path = "../bongterm-diagnostics" }
+bongterm-ledger = { path = "../bongterm-ledger" }
 bongterm-ui = { path = "../bongterm-ui" }
+bongterm-pty = { path = "../bongterm-pty" }
+bongterm-term = { path = "../bongterm-term" }
+bongterm-render = { path = "../bongterm-render" }
+anyhow = { workspace = true }
+iced = { workspace = true }
+# Event-driven PTY worker: blocking reader thread -> async bridge (blocking_send)
+# + select! over output/input. iced already runs on a tokio runtime (its "tokio"
+# feature); this declares the direct dependency the worker uses.
+tokio = { workspace = true }
+
+[dev-dependencies]
+bongterm-mux = { path = "../bongterm-mux" }
+bongterm-devassist = { path = "../bongterm-devassist" }
+bongterm-test-kit = { path = "../bongterm-test-kit" }
+time = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+bongterm-storage-api = { path = "../bongterm-storage-api" }

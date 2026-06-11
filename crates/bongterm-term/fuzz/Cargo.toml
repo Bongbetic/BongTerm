@@ -1,0 +1,19 @@
+[package]
+name = "bongterm-term-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+bongterm-term = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "vt_parser"
+path = "fuzz_targets/vt_parser.rs"
+test = false
+doc = false
+bench = false

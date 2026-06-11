@@ -1,0 +1,13 @@
+# Force LF in the working tree for all text files on every platform.
+#
+# Rationale: rustfmt is configured with `newline_style = "Unix"` (LF), and CI
+# runs `cargo fmt --all -- --check` on windows-latest, where git defaults to
+# core.autocrlf=true. Without this pin a fresh CI checkout would convert the
+# LF-stored blobs to CRLF in the working tree, and the fmt gate would fail even
+# though every file is stored as LF. `eol=lf` overrides autocrlf so checkouts
+# stay LF and local == CI.
+#
+# `text=auto` lets git auto-detect text vs binary; detected-binary files are
+# left untouched. The vendored wezterm submodule has its own git repo and is
+# not governed by this file.
+* text=auto eol=lf

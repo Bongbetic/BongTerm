@@ -37,9 +37,10 @@ pub struct PtyChild {
     reader: Option<Box<dyn std::io::Read + Send>>,
     /// Write half of the PTY master (child stdin).
     pub writer: Box<dyn std::io::Write + Send>,
-    // Keep master alive: ConPTY `Arc<Mutex<Inner>>` holds the HPCON; dropping
-    // master closes it and breaks the reader/writer pipes.
-    _master: Box<dyn portable_pty::MasterPty + Send>,
+    // Master PTY handle. Kept alive (ConPTY `Arc<Mutex<Inner>>` holds the HPCON;
+    // dropping it closes the HPCON and breaks the reader/writer pipes) and also
+    // used for `resize`.
+    master: Box<dyn portable_pty::MasterPty + Send>,
     // Keep child handle alive for future wait()/kill() calls.
     _child: Box<dyn portable_pty::Child + Send + Sync>,
 }
@@ -48,6 +49,18 @@ impl PtyChild {
     /// Take the read half of the PTY master. Returns `None` if already taken.
     pub fn take_reader(&mut self) -> Option<Box<dyn std::io::Read + Send>> {
         self.reader.take()
+    }
+
+    /// Resize the PTY to `cols`×`rows` cells (pixel dims left at 0 — `ConPTY`
+    /// uses the cell grid). Signals the child (`SIGWINCH`-equivalent) so it reflows.
+    pub fn resize(&self, cols: u16, rows: u16) -> Result<()> {
+        self.master.resize(portable_pty::PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+        Ok(())
     }
 }
 
@@ -69,7 +82,7 @@ pub struct PortablePtyHost;
 
 impl PtyHost for PortablePtyHost {
     fn spawn(&self, spec: ChildSpec) -> Result<PtyChild> {
-        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+        use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
         let pty_system = native_pty_system();
         let pair = pty_system.openpty(PtySize {
@@ -102,7 +115,7 @@ impl PtyHost for PortablePtyHost {
             pid,
             reader: Some(reader),
             writer,
-            _master: master,
+            master,
             _child: child,
         })
     }
@@ -157,9 +170,7 @@ mod tests {
     fn portable_pty_host_writer_accepts_input() {
         use std::io::Write;
         let h = PortablePtyHost;
-        let mut child = h
-            .spawn(cmd_spec(vec!["/K"]))
-            .expect("spawn should succeed");
+        let mut child = h.spawn(cmd_spec(vec!["/K"])).expect("spawn should succeed");
         assert!(child.writer.write_all(b"exit\r\n").is_ok());
     }
 }

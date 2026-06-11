@@ -1,0 +1,55 @@
+name: nightly
+on:
+  schedule:
+    # 07:00 UTC daily. Phase exit gates must be green for 7 consecutive runs.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+          components: rustfmt,clippy
+
+      # Phase 2 exit gates (spec §6.1 #15, #24).
+      - name: Gate 15 — agent launch + transcript capture
+        run: cargo test -p bongterm-agents --test gate15
+      - name: Gate 24 — prompt-injection corpus
+        run: cargo run -p xtask -- prompt-injection-corpus
+
+      # Phase 1 exit gates (spec §6.1).
+      - name: Gate 1 — shell profiles launch (absent profiles skipped + logged)
+        run: cargo test -p bongterm-app --test gate01_shell_smoke -- --nocapture
+      - name: Gate 4/5/6/7/17 — cold-start, RSS+VRAM, idle, panes, dashboard
+        run: cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture
+      - name: Gate 5 — live one-session RSS tripwire
+        run: cargo test -p bongterm-app --test gate05_rss -- --nocapture
+      - name: Gate 8 — command blocks (fixture corpus replay + detection latency p99 ≤ 5 ms)
+        run: cargo test -p bongterm-blocks -- --nocapture
+      - name: Gate 28 — settings load + validation failure + backup + Safe Mode + migration
+        run: cargo test -p bongterm-settings --test gate28_settings_recovery -- --nocapture
+      - name: Gate 29 — SQLite + sidecar recovery (torn / checksum / corrupt DB)
+        run: cargo test -p bongterm-storage-sqlite --test gate29_storage_recovery_suite -- --nocapture
+
+      # Phase 5 exit gates.
+      - name: Gate 18 — accessibility, IME, DPI model tests
+        run: cargo test -p bongterm-ui
+      - name: Gate 19/26 — diagnostics consent, redacted export, recovery, minidump
+        run: cargo test -p bongterm-diagnostics
+      - name: Gate 21 — forbidden abstraction static/runtime checks
+        run: cargo run -p xtask -- forbidden-abstraction
+      - name: Gate 25 — renderer device-loss recovery
+        run: cargo test -p bongterm-render device_loss
+      - name: Gate 30 — package, SBOM, provenance
+        run: |
+          cargo run -p xtask -- package-msix
+          cargo run -p xtask -- sbom
+          cargo run -p xtask -- attestation

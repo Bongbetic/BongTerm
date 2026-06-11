@@ -5,7 +5,7 @@
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
 
-use crate::ShellMessage;
+use crate::{SHELL_PANEL_PADDING, SHELL_SIDE_PANEL_WIDTH, ShellMessage};
 
 /// UI-local mirror of agent lifecycle state (no domain dependency).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +86,7 @@ pub struct ApprovalRowVm {
 }
 
 /// Whole-sidebar view-model.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AgentSidebarVm {
     pub agents: Vec<AgentRowVm>,
     pub approvals: Vec<ApprovalRowVm>,
@@ -146,9 +146,9 @@ impl AgentSidebarVm {
         }
 
         container(col)
-            .width(220)
+            .width(Length::Fixed(SHELL_SIDE_PANEL_WIDTH))
             .height(Length::Fill)
-            .padding(8)
+            .padding(SHELL_PANEL_PADDING)
             .into()
     }
 }

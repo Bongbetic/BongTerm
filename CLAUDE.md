@@ -12,7 +12,7 @@ Steps 2 and 3 are reads, not writes — do them with the Read tool, not by spawn
 
 ## Handoff documents
 
-Always write `handoff.md` to the **repo root** (`C:\Users\souba\Documents\Projects\BongT\handoff.md`), never to a temp dir, `%TEMP%`, or any path outside the workspace. A handoff written outside the workspace cannot be found by the next session's resume protocol and is effectively lost. If a prior handoff was written elsewhere, relocate it into the workspace.
+Always write `handoff.md` to the **repo root** (`D:\Programming\Bongbetic\BongT\handoff.md`), never to a temp dir, `%TEMP%`, or any path outside the workspace. A handoff written outside the workspace cannot be found by the next session's resume protocol and is effectively lost. If a prior handoff was written elsewhere, relocate it into the workspace.
 
 ## Planning phase (before `orca.md` exists)
 

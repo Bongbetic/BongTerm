@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "xtask", about = "BongTerm workspace tasks")]
@@ -40,6 +41,32 @@ enum Cmd {
     CleanupChunks,
     /// Produce signed MSIX artifact (Phase 5).
     PackageMsix,
+    /// Emit SLSA provenance attestation.
+    Attestation {
+        /// Subject artifact to attest.
+        #[arg(long, default_value = "Cargo.lock")]
+        subject: PathBuf,
+        /// Output path for the in-toto JSONL statement.
+        #[arg(long, default_value = "attestation.intoto.jsonl")]
+        out: PathBuf,
+    },
+    /// Emit SHA-256 sidecars and combined checksums.txt over a dist directory.
+    Checksums {
+        /// Dist directory to checksum.
+        dir: PathBuf,
+    },
+    /// Verify release artifact completeness, checksums, attestation, SBOM, and secrets.
+    ReleaseVerify {
+        /// Dist directory to verify.
+        dir: PathBuf,
+    },
+    /// Validate static landing page required claims and internal links.
+    SiteCheck {
+        /// Site directory to validate.
+        dir: PathBuf,
+    },
+    /// Scan for forbidden implementation techniques.
+    ForbiddenAbstraction,
 }
 
 fn main() -> Result<()> {
@@ -55,16 +82,26 @@ fn main() -> Result<()> {
         Cmd::PromptInjectionCorpus => prompt_injection_corpus::run(),
         Cmd::CleanupChunks => cleanup_chunks::run(),
         Cmd::PackageMsix => package_msix::run(),
+        Cmd::Attestation { subject, out } => attestation::run(&subject, &out),
+        Cmd::Checksums { dir } => checksums::run(&dir),
+        Cmd::ReleaseVerify { dir } => release_verify::run(&dir),
+        Cmd::SiteCheck { dir } => site_check::run(&dir),
+        Cmd::ForbiddenAbstraction => forbidden_abstraction::run(),
     }
 }
 
+mod attestation;
 mod bench_report;
 mod check_deps;
 mod check_licenses;
+mod checksums;
 mod cleanup_chunks;
 mod doctor;
+mod forbidden_abstraction;
 mod package_msix;
 mod prompt_injection_corpus;
+mod release_verify;
 mod sbom;
 mod secret_leak_corpus;
+mod site_check;
 mod upstream_sync;

@@ -11,9 +11,119 @@ use bongterm_settings::{KeybindingSettings, Settings};
 use iced::widget::{button, column, container, row, stack, text, text_input};
 use iced::{Element, Length, Task, Theme};
 
+pub mod accessibility;
 pub mod agent_sidebar;
+pub mod devux;
+pub mod dpi;
+pub mod ime;
 
 pub type ShellResult = iced::Result;
+
+/// Shell outer padding in logical pixels.
+pub const SHELL_OUTER_PADDING: u16 = 12;
+/// Gap between the agent panel, terminal surface, and resource panel.
+pub const SHELL_BODY_SPACING: u16 = 8;
+/// Vertical gap between title/tab/body/status regions.
+pub const SHELL_COLUMN_SPACING: u16 = 8;
+/// Side-panel width used by both panel views.
+pub const SHELL_SIDE_PANEL_WIDTH: f32 = 220.0;
+/// Side-panel internal padding in logical pixels.
+pub const SHELL_PANEL_PADDING: u16 = 8;
+/// Fixed shell chrome heights used by the layout helper and the view.
+pub const SHELL_TITLE_BAR_HEIGHT: f32 = 24.0;
+pub const SHELL_TAB_STRIP_HEIGHT: f32 = 24.0;
+pub const SHELL_STATUS_BAR_HEIGHT: f32 = 20.0;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TerminalSurfaceSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Resource dashboard view-model
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceDashboardVm {
+    pub total_rss: String,
+    pub total_cpu_pct: String,
+    pub vram: Option<String>,
+    pub rows: Vec<ResourceRowVm>,
+    pub is_stale: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceRowVm {
+    pub category: String,
+    pub pid: u32,
+    pub rss: String,
+    pub cpu_pct: String,
+}
+
+impl ResourceRowVm {
+    #[must_use]
+    pub fn title_line(&self) -> &str {
+        &self.category
+    }
+
+    #[must_use]
+    pub fn metrics_line(&self) -> String {
+        format!("pid {} | RSS {} | CPU {}", self.pid, self.rss, self.cpu_pct)
+    }
+}
+
+impl Default for ResourceDashboardVm {
+    fn default() -> Self {
+        Self {
+            total_rss: "0 B".to_string(),
+            total_cpu_pct: "0.0%".to_string(),
+            vram: None,
+            rows: vec![],
+            is_stale: false,
+        }
+    }
+}
+
+impl ResourceDashboardVm {
+    #[must_use]
+    pub fn view(&self) -> Element<'_, ShellMessage> {
+        let freshness = if self.is_stale { "stale" } else { "live" };
+        let vram = self.vram.as_deref().unwrap_or("Metric unavailable from OS");
+
+        let mut col = column![
+            text("Resources").size(16),
+            text(format!(
+                "RSS {} | CPU {} | {}",
+                self.total_rss, self.total_cpu_pct, freshness
+            ))
+            .size(12),
+            text(format!("VRAM {vram}")).size(12),
+        ]
+        .spacing(8);
+
+        if self.rows.is_empty() {
+            col = col.push(text("No process samples").size(12));
+        } else {
+            for row_vm in self.rows.iter().take(6) {
+                col = col.push(
+                    column![
+                        text(row_vm.title_line()).size(13),
+                        text(row_vm.metrics_line()).size(12)
+                    ]
+                    .spacing(2)
+                    .width(Length::Fill),
+                );
+            }
+        }
+
+        container(col)
+            .width(Length::Fixed(SHELL_SIDE_PANEL_WIDTH))
+            .height(Length::Fill)
+            .padding(SHELL_PANEL_PADDING)
+            .into()
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Focus
@@ -207,8 +317,16 @@ impl CommandPalette {
 pub struct KeyboardMap;
 
 impl KeyboardMap {
+    // Kept as a `&self` method (not an associated fn) for call-site ergonomics
+    // and API stability: callers invoke `keymap.shortcut_for(..)`. KeyboardMap is
+    // a ZST, so the `&self` receiver is zero-cost.
+    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     #[must_use]
-    pub fn shortcut_for<'a>(&self, command: CommandId, keybindings: &'a KeybindingSettings) -> &'a str {
+    pub fn shortcut_for<'a>(
+        &self,
+        command: CommandId,
+        keybindings: &'a KeybindingSettings,
+    ) -> &'a str {
         match command {
             CommandId::OpenCommandPalette => &keybindings.command_palette,
             CommandId::ReloadSettings => "",
@@ -293,6 +411,10 @@ pub enum OnboardingStep {
 }
 
 impl OnboardingStep {
+    // Explicit per-step transitions kept for readability: the terminal
+    // `Finish => Finish` self-loop is intentional and worth showing alongside
+    // the `ResourceBudgets => Finish` edge even though both land on Finish.
+    #[allow(clippy::match_same_arms)]
     fn next(self) -> Self {
         match self {
             Self::Welcome => Self::Shell,
@@ -384,12 +506,18 @@ pub enum ShellMessage {
 // Shell
 // ---------------------------------------------------------------------------
 
+// Each bool is an independent UI toggle (sidebar/dashboard/palette/onboarding)
+// with its own message-driven lifecycle; bundling them into a flags type would
+// obscure intent without changing behavior.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct BongTermShell {
     workspace_name: String,
     focus: ShellFocus,
     agent_sidebar_expanded: bool,
     resource_dashboard_expanded: bool,
+    agent_sidebar: agent_sidebar::AgentSidebarVm,
+    resource_dashboard: ResourceDashboardVm,
     command_palette_open: bool,
     command_palette: CommandPalette,
     palette_state: PaletteState,
@@ -414,6 +542,11 @@ impl BongTermShell {
             focus: ShellFocus::Terminal,
             agent_sidebar_expanded: false,
             resource_dashboard_expanded: false,
+            agent_sidebar: agent_sidebar::AgentSidebarVm {
+                agents: vec![],
+                approvals: vec![],
+            },
+            resource_dashboard: ResourceDashboardVm::default(),
             command_palette_open: false,
             command_palette: CommandPalette::default(),
             palette_state: PaletteState::default(),
@@ -444,6 +577,9 @@ impl BongTermShell {
         format!("BongTerm - {}", self.workspace_name)
     }
 
+    // Kept as a `&self` method for API stability (callers use
+    // `shell.region_names()`); the region set is fixed and does not read state.
+    #[allow(clippy::unused_self)]
     #[must_use]
     pub const fn region_names(&self) -> [&'static str; 7] {
         [
@@ -487,10 +623,51 @@ impl BongTermShell {
         &self.command_palette
     }
 
+    pub fn set_panel_data(
+        &mut self,
+        agent_sidebar: agent_sidebar::AgentSidebarVm,
+        resource_dashboard: ResourceDashboardVm,
+    ) {
+        self.agent_sidebar = agent_sidebar;
+        self.resource_dashboard = resource_dashboard;
+    }
+
+    #[must_use]
+    pub fn agent_sidebar_snapshot(&self) -> &agent_sidebar::AgentSidebarVm {
+        &self.agent_sidebar
+    }
+
+    #[must_use]
+    pub const fn resource_dashboard_snapshot(&self) -> &ResourceDashboardVm {
+        &self.resource_dashboard
+    }
+
+    #[must_use]
+    pub fn terminal_surface_size_for_window(width: f32, height: f32) -> TerminalSurfaceSize {
+        let horizontal_chrome = (2.0 * f32::from(SHELL_OUTER_PADDING))
+            + (2.0 * SHELL_SIDE_PANEL_WIDTH)
+            + (2.0 * f32::from(SHELL_BODY_SPACING));
+        let vertical_chrome = (2.0 * f32::from(SHELL_OUTER_PADDING))
+            + SHELL_TITLE_BAR_HEIGHT
+            + SHELL_TAB_STRIP_HEIGHT
+            + SHELL_STATUS_BAR_HEIGHT
+            + (3.0 * f32::from(SHELL_COLUMN_SPACING));
+
+        TerminalSurfaceSize {
+            width: (width - horizontal_chrome).max(1.0),
+            height: (height - vertical_chrome).max(1.0),
+        }
+    }
+
     pub fn boot() -> (Self, Task<ShellMessage>) {
         (Self::default(), Task::none())
     }
 
+    // match_same_arms: the empty `NoOp` arm is kept distinct from the empty
+    //   agent/approval arms — they are semantically different messages.
+    // collapsible_if: the nested `if let Some(cmd)` / `if active` is left
+    //   un-collapsed so the `// Disabled commands` else-path comment stays put.
+    #[allow(clippy::match_same_arms, clippy::collapsible_if)]
     pub fn update(&mut self, message: ShellMessage) -> Task<ShellMessage> {
         match message {
             ShellMessage::NoOp => {}
@@ -510,13 +687,19 @@ impl BongTermShell {
             }
             ShellMessage::PaletteSelectNext => {
                 if self.command_palette_open {
-                    let count = self.command_palette.filter(self.palette_state.query()).len();
+                    let count = self
+                        .command_palette
+                        .filter(self.palette_state.query())
+                        .len();
                     self.palette_state.select_next(count);
                 }
             }
             ShellMessage::PaletteSelectPrev => {
                 if self.command_palette_open {
-                    let count = self.command_palette.filter(self.palette_state.query()).len();
+                    let count = self
+                        .command_palette
+                        .filter(self.palette_state.query())
+                        .len();
                     self.palette_state.select_prev(count);
                 }
             }
@@ -551,9 +734,13 @@ impl BongTermShell {
         Task::none()
     }
 
+    // `&self` is required: this is passed as `fn(&State) -> Subscription` to
+    // `iced::application(..).subscription(BongTermShell::subscription)`. The
+    // event subscription is global, so the receiver is unused but mandatory.
+    #[allow(clippy::unused_self)]
     pub fn subscription(&self) -> iced::Subscription<ShellMessage> {
         use iced::event::Event;
-        use iced::keyboard::{self, key::Named, Key};
+        use iced::keyboard::{self, Key, key::Named};
 
         // Spike S3b confirmed: listen_raw(event, status, window) delivers all events.
         iced::event::listen_raw(|event, _status, _window| {
@@ -572,8 +759,7 @@ impl BongTermShell {
                         return Some(ShellMessage::PaletteExecuteSelected);
                     }
                     Key::Character("p")
-                        if modifiers
-                            == keyboard::Modifiers::CTRL | keyboard::Modifiers::SHIFT =>
+                        if modifiers == keyboard::Modifiers::CTRL | keyboard::Modifiers::SHIFT =>
                     {
                         return Some(ShellMessage::OpenCommandPalette);
                     }
@@ -585,31 +771,57 @@ impl BongTermShell {
     }
 
     fn main_view(&self) -> Element<'_, ShellMessage> {
-        let title_bar = text(self.title()).size(16);
-        let tab_strip = row![text("[PowerShell - workspace]"), text("[+]")].spacing(8);
-        let body = row![
-            shell_panel("Agents", "collapsed"),
-            container(text("Terminal surface\n\nshell prompt appears here"))
-                .width(Length::Fill)
-                .height(Length::Fill),
-            shell_panel("Resources", "collapsed")
-        ]
-        .spacing(8)
-        .height(Length::Fill);
-        let status_bar = text("shell ready | workspace | resources ok").size(12);
+        let terminal = container(text("Terminal surface\n\nshell prompt appears here"))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
+        self.view_with_terminal(terminal, std::convert::identity)
+    }
 
-        let base: Element<'_, ShellMessage> = column![title_bar, tab_strip, body, status_bar]
-            .spacing(8)
-            .padding(12)
+    pub fn view_with_terminal<'a, Message, F>(
+        &'a self,
+        terminal: Element<'a, Message>,
+        map_shell: F,
+    ) -> Element<'a, Message>
+    where
+        Message: Clone + 'a,
+        F: Fn(ShellMessage) -> Message + Copy + 'a,
+    {
+        let title_bar: Element<'a, Message> = container(text(self.title()).size(16))
+            .height(Length::Fixed(SHELL_TITLE_BAR_HEIGHT))
+            .into();
+        let tab_strip: Element<'a, Message> = container(
+            row![text("[PowerShell - workspace]"), text("[+]")]
+                .spacing(u32::from(SHELL_BODY_SPACING)),
+        )
+        .height(Length::Fixed(SHELL_TAB_STRIP_HEIGHT))
+        .into();
+        let body: Element<'a, Message> = row![
+            self.agent_sidebar.view().map(map_shell),
+            container(terminal).width(Length::Fill).height(Length::Fill),
+            self.resource_dashboard.view().map(map_shell)
+        ]
+        .spacing(u32::from(SHELL_BODY_SPACING))
+        .height(Length::Fill)
+        .into();
+        let status_bar: Element<'a, Message> =
+            container(text("shell ready | workspace | resources ok").size(12))
+                .height(Length::Fixed(SHELL_STATUS_BAR_HEIGHT))
+                .into();
+
+        let base: Element<'a, Message> = column![title_bar, tab_strip, body, status_bar]
+            .spacing(u32::from(SHELL_COLUMN_SPACING))
+            .padding(SHELL_OUTER_PADDING)
             .into();
 
         if self.command_palette_open {
-            stack![base, self.palette_overlay()].into()
+            stack![base, self.palette_overlay().map(map_shell)].into()
         } else {
             base
         }
     }
 
+    #[must_use]
     pub fn view(&self) -> Element<'_, ShellMessage> {
         let main = self.main_view();
         if self.onboarding_active {
@@ -641,7 +853,9 @@ impl BongTermShell {
             .width(540)
             .padding(8)
             .style(|_theme: &Theme| iced::widget::container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.18))),
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.15, 0.15, 0.18,
+                ))),
                 border: iced::Border {
                     color: iced::Color::from_rgb(0.35, 0.35, 0.45),
                     width: 1.0,
@@ -685,25 +899,20 @@ impl BongTermShell {
 
         let body = self.onboarding_step_body();
 
-        let card = container(
-            column![
-                text(step_label).size(20),
-                body,
-                next_btn,
-            ]
-            .spacing(16),
-        )
-        .width(480)
-        .padding(24)
-        .style(|_theme: &Theme| iced::widget::container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgb(0.12, 0.12, 0.15))),
-            border: iced::Border {
-                color: iced::Color::from_rgb(0.35, 0.35, 0.45),
-                width: 1.0,
-                radius: 12.0.into(),
-            },
-            ..Default::default()
-        });
+        let card = container(column![text(step_label).size(20), body, next_btn,].spacing(16))
+            .width(480)
+            .padding(24)
+            .style(|_theme: &Theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.12, 0.12, 0.15,
+                ))),
+                border: iced::Border {
+                    color: iced::Color::from_rgb(0.35, 0.35, 0.45),
+                    width: 1.0,
+                    radius: 12.0.into(),
+                },
+                ..Default::default()
+            });
 
         container(card)
             .width(Length::Fill)
@@ -768,12 +977,14 @@ impl BongTermShell {
             OnboardingStep::ResourceBudgets => {
                 text("Default resource budgets apply. Adjust in settings.").into()
             }
-            OnboardingStep::Finish => {
-                text("Setup complete. Open a shell to get started.").into()
-            }
+            OnboardingStep::Finish => text("Setup complete. Open a shell to get started.").into(),
         }
     }
 
+    // `&self` is required: passed as `fn(&State) -> Theme` to
+    // `iced::application(..).theme(BongTermShell::theme)`. The theme is fixed and
+    // does not read state, but the receiver is mandatory for the wiring.
+    #[allow(clippy::unused_self)]
     #[must_use]
     pub const fn theme(&self) -> Theme {
         Theme::Dark
@@ -802,7 +1013,9 @@ fn palette_row<'a>(
         .width(Length::Fill)
         .style(move |_theme: &Theme| {
             let base_bg = if selected {
-                Some(iced::Background::Color(iced::Color::from_rgb(0.2, 0.3, 0.5)))
+                Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.2, 0.3, 0.5,
+                )))
             } else {
                 None
             };
@@ -820,6 +1033,12 @@ fn palette_row<'a>(
         .into()
 }
 
+/// Run the `BongTerm` shell application to completion.
+///
+/// # Errors
+///
+/// Returns an [`iced::Error`] if the windowing/graphics backend fails to
+/// initialize or the application event loop terminates abnormally.
 pub fn run_shell() -> ShellResult {
     iced::application(
         BongTermShell::boot,
@@ -830,13 +1049,6 @@ pub fn run_shell() -> ShellResult {
     .theme(BongTermShell::theme)
     .subscription(BongTermShell::subscription)
     .run()
-}
-
-fn shell_panel<'a>(title: &'a str, state: &'a str) -> Element<'a, ShellMessage> {
-    container(column![text(title).size(14), text(state).size(12)])
-        .width(160)
-        .height(Length::Fill)
-        .into()
 }
 
 #[cfg(test)]
@@ -883,14 +1095,35 @@ mod tests {
     fn default_keymap_reads_phase1_bindings_from_settings() {
         let settings = KeybindingSettings::default();
         let keymap = KeyboardMap;
-        assert_eq!(keymap.shortcut_for(CommandId::OpenCommandPalette, &settings), "Ctrl+Shift+P");
-        assert_eq!(keymap.shortcut_for(CommandId::NewTab, &settings), "Ctrl+Shift+T");
-        assert_eq!(keymap.shortcut_for(CommandId::ClosePane, &settings), "Ctrl+Shift+W");
-        assert_eq!(keymap.shortcut_for(CommandId::SplitPane, &settings), "Alt+Shift+D");
-        assert_eq!(keymap.shortcut_for(CommandId::FindInPane, &settings), "Ctrl+F");
-        assert_eq!(keymap.shortcut_for(CommandId::OpenResourceDashboard, &settings), "Ctrl+Shift+R");
+        assert_eq!(
+            keymap.shortcut_for(CommandId::OpenCommandPalette, &settings),
+            "Ctrl+Shift+P"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::NewTab, &settings),
+            "Ctrl+Shift+T"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::ClosePane, &settings),
+            "Ctrl+Shift+W"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::SplitPane, &settings),
+            "Alt+Shift+D"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::FindInPane, &settings),
+            "Ctrl+F"
+        );
+        assert_eq!(
+            keymap.shortcut_for(CommandId::OpenResourceDashboard, &settings),
+            "Ctrl+Shift+R"
+        );
         assert_eq!(keymap.shortcut_for(CommandId::CmdK, &settings), "Ctrl+K");
-        assert_eq!(keymap.shortcut_for(CommandId::SmartHistory, &settings), "Ctrl+R");
+        assert_eq!(
+            keymap.shortcut_for(CommandId::SmartHistory, &settings),
+            "Ctrl+R"
+        );
     }
 
     #[test]
@@ -900,7 +1133,8 @@ mod tests {
         assert!(reload_ids.contains(&CommandId::ReloadSettings));
         let layout_ids: Vec<CommandId> = palette.filter("layout").iter().map(|c| c.id).collect();
         assert!(layout_ids.contains(&CommandId::SplitPane));
-        let resource_ids: Vec<CommandId> = palette.filter("resources").iter().map(|c| c.id).collect();
+        let resource_ids: Vec<CommandId> =
+            palette.filter("resources").iter().map(|c| c.id).collect();
         assert!(resource_ids.contains(&CommandId::OpenResourceDashboard));
     }
 
@@ -1077,7 +1311,10 @@ mod tests {
             shell.update(ShellMessage::PaletteSelectNext);
         }
         shell.update(ShellMessage::PaletteExecuteSelected);
-        assert!(shell.command_palette_open(), "palette must stay open for disabled command");
+        assert!(
+            shell.command_palette_open(),
+            "palette must stay open for disabled command"
+        );
     }
 
     // --- 1.A.4 onboarding tests ---
@@ -1140,7 +1377,10 @@ mod tests {
     fn shell_active_when_onboarding_not_completed() {
         use bongterm_settings::OnboardingSettings;
         let settings = Settings {
-            onboarding: OnboardingSettings { completed: false, ..OnboardingSettings::default() },
+            onboarding: OnboardingSettings {
+                completed: false,
+                ..OnboardingSettings::default()
+            },
             ..Settings::default()
         };
         let shell = BongTermShell::with_settings(settings);
@@ -1151,7 +1391,10 @@ mod tests {
     fn shell_inactive_when_onboarding_completed() {
         use bongterm_settings::OnboardingSettings;
         let settings = Settings {
-            onboarding: OnboardingSettings { completed: true, ..OnboardingSettings::default() },
+            onboarding: OnboardingSettings {
+                completed: true,
+                ..OnboardingSettings::default()
+            },
             ..Settings::default()
         };
         let shell = BongTermShell::with_settings(settings);
@@ -1173,5 +1416,18 @@ mod tests {
         shell.update(ShellMessage::OnboardingFinish);
         assert!(!shell.is_onboarding_active());
         assert!(shell.settings().onboarding.completed);
+    }
+
+    #[test]
+    fn resource_row_separates_title_from_metrics() {
+        let row = ResourceRowVm {
+            category: "BongTerm".to_string(),
+            pid: 26_696,
+            rss: "15 MB".to_string(),
+            cpu_pct: "0.0%".to_string(),
+        };
+
+        assert_eq!(row.title_line(), "BongTerm");
+        assert_eq!(row.metrics_line(), "pid 26696 | RSS 15 MB | CPU 0.0%");
     }
 }

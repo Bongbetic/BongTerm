@@ -2,7 +2,7 @@
 //!
 //! # Safety
 //!
-//! `rusqlite::Connection` is `!Send` because it holds thread-local SQLite
+//! `rusqlite::Connection` is `!Send` because it holds thread-local `SQLite`
 //! error state. We wrap it in a `parking_lot::Mutex` which guarantees
 //! exclusive access at any given time. The `unsafe impl Send + Sync` below is
 //! sound: we never rely on the thread-local error state — all errors propagate
@@ -18,10 +18,10 @@
 pub mod sidecar;
 
 use bongterm_storage_api::{
-    AgentRunId, AgentRunRepo, AgentRunRow, BlockId, BlockRepo, CommandBlockRow, LedgerRepo,
-    McpCallId, McpCallRepo, McpCallRow, MigrationRunner, PaneId, PaneRepo, PaneRow, SessionId,
-    SessionRepo, SessionRow, StorageError, TranscriptId, TranscriptRepo, TranscriptRow,
-    WorkspaceId, WorkspaceRepo, WorkspaceRow,
+    AgentRunId, AgentRunRepo, AgentRunRow, BlockId, BlockRepo, CommandBlockRow, FrecencyRepo,
+    FrecencyRow, LedgerRepo, McpCallId, McpCallRepo, McpCallRow, MigrationRunner, PaneId, PaneRepo,
+    PaneRow, SessionId, SessionRepo, SessionRow, StorageError, TranscriptId, TranscriptRepo,
+    TranscriptRow, WorkspaceId, WorkspaceRepo, WorkspaceRow,
 };
 use parking_lot::Mutex;
 
@@ -90,10 +90,21 @@ CREATE TABLE IF NOT EXISTS ledger_samples (
 );
 ";
 
+const MIGRATION_0002_FRECENCY: &str = "
+CREATE TABLE IF NOT EXISTS frecency (
+    command        TEXT    NOT NULL PRIMARY KEY,
+    use_count      INTEGER NOT NULL DEFAULT 0,
+    last_used_unix INTEGER NOT NULL
+);
+";
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Takes the error by value so it can be used directly as `.map_err(db_err)` at
+// ~20 call sites; `map_or`/`map_err` hand the closure an owned `rusqlite::Error`.
+#[allow(clippy::needless_pass_by_value)]
 fn db_err(e: rusqlite::Error) -> StorageError {
     StorageError::Database(e.to_string())
 }
@@ -144,14 +155,94 @@ impl SqliteStore {
         let conn = rusqlite::Connection::open(path).map_err(db_err)?;
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")
             .map_err(db_err)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Open an in-memory database (for tests).
     pub fn open_in_memory() -> Result<Self, StorageError> {
         let conn = rusqlite::Connection::open_in_memory().map_err(db_err)?;
-        conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(db_err)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .map_err(db_err)?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
+    }
+}
+
+/// SQLite-backed [`FrecencyRepo`].
+pub struct SqliteFrecencyRepo {
+    conn: Mutex<rusqlite::Connection>,
+}
+
+#[allow(unsafe_code)]
+// SAFETY: Same `rusqlite::Connection` synchronization invariant as SqliteStore.
+unsafe impl Send for SqliteFrecencyRepo {}
+
+#[allow(unsafe_code)]
+// SAFETY: See Send impl above.
+unsafe impl Sync for SqliteFrecencyRepo {}
+
+impl SqliteFrecencyRepo {
+    /// Open an in-memory DB for tests.
+    pub fn open_in_memory() -> Result<Self, StorageError> {
+        let conn = rusqlite::Connection::open_in_memory().map_err(db_err)?;
+        Self::from_conn(conn)
+    }
+
+    /// Wrap an existing connection and ensure the frecency schema exists.
+    pub fn from_conn(conn: rusqlite::Connection) -> Result<Self, StorageError> {
+        conn.execute_batch(MIGRATION_0002_FRECENCY)
+            .map_err(db_err)?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
+    }
+}
+
+impl FrecencyRepo for SqliteFrecencyRepo {
+    fn record_use(&self, command: &str, at_unix: i64) -> Result<(), StorageError> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO frecency (command, use_count, last_used_unix)
+             VALUES (?1, 1, ?2)
+             ON CONFLICT(command) DO UPDATE SET
+                use_count = use_count + 1,
+                last_used_unix = ?2",
+            rusqlite::params![command, at_unix],
+        )
+        .map_err(db_err)?;
+        Ok(())
+    }
+
+    fn top_n(&self, n: usize, now_unix: i64) -> Result<Vec<FrecencyRow>, StorageError> {
+        let mut rows: Vec<FrecencyRow> = {
+            let conn = self.conn.lock();
+            let mut stmt = conn
+                .prepare("SELECT command, use_count, last_used_unix FROM frecency")
+                .map_err(db_err)?;
+            stmt.query_map([], |row| {
+                Ok(FrecencyRow {
+                    command: row.get(0)?,
+                    use_count: row.get::<_, i64>(1)? as u64,
+                    last_used_unix: row.get(2)?,
+                })
+            })
+            .map_err(db_err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(db_err)?
+        };
+
+        rows.sort_by(|a, b| {
+            let score_a = bongterm_storage_api::frecency_score(a, now_unix);
+            let score_b = bongterm_storage_api::frecency_score(b, now_unix);
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        rows.truncate(n);
+        Ok(rows)
     }
 }
 
@@ -449,6 +540,9 @@ impl AgentRunRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl TranscriptRepo for SqliteStore {
+    // chunk_index is a non-negative monotonic counter; SQLite stores INTEGER as
+    // i64, so the u64->i64 cast is in range for any realistic chunk count.
+    #[allow(clippy::cast_possible_wrap)]
     fn append_chunk(&self, row: &TranscriptRow) -> Result<(), StorageError> {
         let conn = self.conn.lock();
         conn.execute(
@@ -506,6 +600,9 @@ impl TranscriptRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl McpCallRepo for SqliteStore {
+    // duration_ms is a non-negative elapsed-millis count; SQLite stores INTEGER
+    // as i64, so the u64->i64 cast is in range for any realistic duration.
+    #[allow(clippy::cast_possible_wrap)]
     fn insert_call(&self, row: &McpCallRow) -> Result<(), StorageError> {
         let conn = self.conn.lock();
         conn.execute(
@@ -517,7 +614,7 @@ impl McpCallRepo for SqliteStore {
                 encode_uuid(row.agent_run_id.0),
                 &row.tool_name,
                 row.duration_ms as i64,
-                row.succeeded as i32,
+                i32::from(row.succeeded),
             ],
         )
         .map_err(db_err)?;
@@ -566,6 +663,9 @@ impl McpCallRepo for SqliteStore {
 // ---------------------------------------------------------------------------
 
 impl LedgerRepo for SqliteStore {
+    // rss_bytes is a non-negative process-memory counter; SQLite stores INTEGER
+    // as i64, so the u64->i64 cast is in range on supported targets.
+    #[allow(clippy::cast_possible_wrap)]
     fn record_sample(
         &self,
         ts: time::OffsetDateTime,
@@ -767,9 +867,7 @@ mod tests {
     #[test]
     fn transcript_list_empty_for_unknown_run() {
         let store = migrated();
-        let chunks = store
-            .list_chunks(AgentRunId(Uuid::new_v4()))
-            .expect("list");
+        let chunks = store.list_chunks(AgentRunId(Uuid::new_v4())).expect("list");
         assert!(chunks.is_empty());
     }
 
@@ -797,9 +895,7 @@ mod tests {
     #[test]
     fn mcp_calls_empty_for_unknown_run() {
         let store = migrated();
-        let calls = store
-            .list_calls(AgentRunId(Uuid::new_v4()))
-            .expect("list");
+        let calls = store.list_calls(AgentRunId(Uuid::new_v4())).expect("list");
         assert!(calls.is_empty());
     }
 
@@ -832,5 +928,29 @@ mod tests {
     #[test]
     fn session_repo_conformance() {
         run_session_repo_conformance(&migrated());
+    }
+}
+
+#[cfg(test)]
+mod frecency_tests {
+    use super::*;
+    use bongterm_storage_api::FrecencyRepo;
+    use bongterm_test_kit::conformance::frecency_repo_conformance::run_frecency_repo_conformance;
+
+    #[test]
+    fn sqlite_frecency_satisfies_conformance() {
+        let repo = SqliteFrecencyRepo::open_in_memory().expect("open in-memory db");
+        run_frecency_repo_conformance(&repo);
+    }
+
+    #[test]
+    fn record_use_increments_count() {
+        let repo = SqliteFrecencyRepo::open_in_memory().unwrap();
+        repo.record_use("ls", 100).unwrap();
+        repo.record_use("ls", 200).unwrap();
+        let rows = repo.top_n(5, 300).unwrap();
+        let ls = rows.iter().find(|row| row.command == "ls").unwrap();
+        assert_eq!(ls.use_count, 2);
+        assert_eq!(ls.last_used_unix, 200);
     }
 }

@@ -1,0 +1,1 @@
+{"_type":"https://in-toto.io/Statement/v1","predicate":{"buildType":"local-cargo-workspace","builder":{"id":"bongterm-xtask"}},"predicateType":"https://slsa.dev/provenance/v1","subject":[{"digest":{"sha256":"630d682f775c6d64620b709f7179539f334eebd276229965e476e3814f1ca999"},"name":"Cargo.lock"}]}

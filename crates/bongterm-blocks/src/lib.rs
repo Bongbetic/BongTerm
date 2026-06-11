@@ -35,7 +35,7 @@ pub enum OscEvent {
     CommandFinished(i32),
     /// `OSC 7;<uri>` — shell reported a new working directory URI.
     WorkingDir(String),
-    /// Sequence not recognized by BongTerm shell integration.
+    /// Sequence not recognized by `BongTerm` shell integration.
     Unrecognized,
 }
 
@@ -124,6 +124,10 @@ pub struct CommandBlock {
 ///
 /// Create one `BlockBuilder` per pane; reset between sessions with
 /// [`BlockBuilder::reset`].
+// Each bool is an independent, named state/confidence flag with distinct
+// lifetime semantics (one transient, four session-level). Packing them into a
+// single bitfield would obscure intent without changing behavior.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default)]
 pub struct BlockBuilder {
     current_cwd: Option<String>,
@@ -319,33 +323,33 @@ mod tests {
     #[test]
     fn confidence_low_after_only_d() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::CommandFinished(0));
+        let _ = b.push(OscEvent::CommandFinished(0));
         assert_eq!(b.confidence(), Confidence::Low);
     }
 
     #[test]
     fn confidence_medium_after_a_and_d() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::PromptStart);
-        b.push(OscEvent::CommandFinished(0));
+        let _ = b.push(OscEvent::PromptStart);
+        let _ = b.push(OscEvent::CommandFinished(0));
         assert_eq!(b.confidence(), Confidence::Medium);
     }
 
     #[test]
     fn confidence_medium_after_c_and_d() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::CommandExecuted);
-        b.push(OscEvent::CommandFinished(0));
+        let _ = b.push(OscEvent::CommandExecuted);
+        let _ = b.push(OscEvent::CommandFinished(0));
         assert_eq!(b.confidence(), Confidence::Medium);
     }
 
     #[test]
     fn confidence_high_after_all_four_markers() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::PromptStart);
-        b.push(OscEvent::CommandStart);
-        b.push(OscEvent::CommandExecuted);
-        b.push(OscEvent::CommandFinished(0));
+        let _ = b.push(OscEvent::PromptStart);
+        let _ = b.push(OscEvent::CommandStart);
+        let _ = b.push(OscEvent::CommandExecuted);
+        let _ = b.push(OscEvent::CommandFinished(0));
         assert_eq!(b.confidence(), Confidence::High);
     }
 
@@ -378,7 +382,7 @@ mod tests {
     #[test]
     fn cwd_before_d_is_included_in_block() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::WorkingDir("/home/user".to_string()));
+        let _ = b.push(OscEvent::WorkingDir("/home/user".to_string()));
         let block = b.push(OscEvent::CommandFinished(0)).unwrap();
         assert_eq!(block.cwd, Some("/home/user".to_string()));
     }
@@ -387,17 +391,17 @@ mod tests {
     fn cwd_after_d_is_not_in_previous_block() {
         let mut b = BlockBuilder::new();
         let block = b.push(OscEvent::CommandFinished(0)).unwrap();
-        b.push(OscEvent::WorkingDir("/new/dir".to_string()));
+        let _ = b.push(OscEvent::WorkingDir("/new/dir".to_string()));
         assert_eq!(block.cwd, None);
     }
 
     #[test]
     fn prompt_start_abandons_in_flight_command() {
         let mut b = BlockBuilder::new();
-        b.push(OscEvent::CommandExecuted); // in_command = true
-        b.push(OscEvent::PromptStart); // should clear in_command
+        let _ = b.push(OscEvent::CommandExecuted); // in_command = true
+        let _ = b.push(OscEvent::PromptStart); // should clear in_command
         // Another command cycle
-        b.push(OscEvent::CommandExecuted);
+        let _ = b.push(OscEvent::CommandExecuted);
         let block = b.push(OscEvent::CommandFinished(0)).unwrap();
         assert_eq!(block.exit_code, Some(0));
     }
@@ -426,8 +430,8 @@ mod tests {
             .unwrap()
             .join("tests/fixtures/osc")
             .join(name);
-        let content = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("fixture {name}: {e}"));
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("fixture {name}: {e}"));
         let mut builder = BlockBuilder::new();
         let mut blocks = Vec::new();
         for line in content.lines() {
@@ -448,10 +452,7 @@ mod tests {
         assert_eq!(confidence, Confidence::High);
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].exit_code, Some(0));
-        assert_eq!(
-            blocks[0].cwd.as_deref(),
-            Some("file:///c:/projects/bongt")
-        );
+        assert_eq!(blocks[0].cwd.as_deref(), Some("file:///c:/projects/bongt"));
     }
 
     #[test]

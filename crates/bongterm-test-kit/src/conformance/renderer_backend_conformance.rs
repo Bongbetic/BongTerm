@@ -1,6 +1,6 @@
 //! Conformance suite for [`bongterm_render::RendererBackend`].
 
-use bongterm_render::{DirtyRegion, RendererBackend, SnapshotId, SurfaceSnapshot};
+use bongterm_render::{CursorVis, DirtyRegion, RendererBackend, SnapshotId, SurfaceSnapshot};
 
 /// Run happy-path conformance checks against any [`RendererBackend`] implementation.
 ///
@@ -13,7 +13,8 @@ pub fn run(backend: &impl RendererBackend) {
         id: SnapshotId(1),
         cols: 80,
         rows: 24,
-        cells: vec![0u32; 80 * 24],
+        spans: vec![],
+        cursor: CursorVis::default(),
     };
     let dirty = [DirtyRegion {
         col: 0,

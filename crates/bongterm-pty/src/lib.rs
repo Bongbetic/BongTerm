@@ -9,7 +9,7 @@ pub mod ring;
 pub use ring::{Slab, SlabPool};
 
 pub mod host;
-pub use host::{ChildSpec, PtyChild, PtyHost, PortablePtyHost, ScaffoldPtyHost};
+pub use host::{ChildSpec, PortablePtyHost, PtyChild, PtyHost, ScaffoldPtyHost};
 
 pub mod reader;
 pub use reader::PtyReaderTask;

@@ -59,7 +59,14 @@ impl AgentLifecycle {
     }
 
     /// Apply a command; update state or reject as illegal.
-    pub fn apply(&mut self, command: LifecycleCommand) -> Result<LifecycleState, IllegalTransition> {
+    // Explicit per-(state, command) transitions kept for readability: this is a
+    // state-transition table where each arm documents one legal edge, even when
+    // several edges happen to land on the same target state.
+    #[allow(clippy::match_same_arms)]
+    pub fn apply(
+        &mut self,
+        command: LifecycleCommand,
+    ) -> Result<LifecycleState, IllegalTransition> {
         use LifecycleCommand as C;
         use LifecycleState as S;
         let next = match (self.state, command) {

@@ -19,7 +19,10 @@ pub fn run(adapter: &impl AgentAdapter) {
 /// Panics if any conformance assertion fails.
 pub fn run_offline(adapter: &impl AgentAdapter) {
     let caps = adapter.capabilities();
-    assert!(!caps.name.is_empty(), "capabilities().name must be non-empty");
+    assert!(
+        !caps.name.is_empty(),
+        "capabilities().name must be non-empty"
+    );
 
     assert!(
         adapter.build_process_spec("C:\\x", "").is_err(),

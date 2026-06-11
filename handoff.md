@@ -1,99 +1,130 @@
-# BongTerm Phase 1 Handoff — 2026-05-29
+# BongTerm Handoff — live-terminal slice: colour, cursor, event-driven I/O, resize — 2026-06-01
 
-## Session summary
+## TL;DR
 
-Phase 1 implementation **100% complete**. All code tasks done. `[next]` = `1.exit` (wire §6.1 gates into CI).
+Interactive session (human at the keyboard running `cargo run -p bongterm-app`
+and reporting what rendered). Drove the **integration spine** — the
+SHIP-READINESS critical path — forward in verified increments. Every renderer
+change below was **visually confirmed by the user**, not committed blind.
 
----
+Landed on `master` (oldest→newest):
 
-## All Phase 1 commits (since Phase 0 exit)
+| Commit | What |
+|--------|------|
+| `d90f0b6` | ci: trigger `ci.yml` on `master` + `workflow_dispatch` (was `main`-only → CI had never run). |
+| `e10f8eb` | feat(render): real per-run **colour + attributes** in the live renderer (was codepoint-only grey). ✅ visually confirmed. |
+| `25436a3` | feat(render): draw the **cursor** as a block glyph in the cosmic-text stream (aligns free, no quad pass). ✅ visually confirmed. |
+| `35cbc94` | docs(1.exit): gate **#6** idle-CPU measured baseline + diagnosis. |
+| `860b72b` | feat(app): **event-driven ConPTY I/O** via a per-pane subscription worker (no idle timer). ✅ confirmed working. |
+| *(pending)* | feat: **window resize** → cell-metrics → cols/rows → ConPTY reflow. ✅ visually confirmed (fills window + reflows). |
 
-| Commit | Task | Summary |
-|--------|------|---------|
-| `8508c11` | 1.D.1 | Pane + tab topology model in `bongterm-mux` |
-| `4c53109` | 1.D.2 | Split h/v, resize, focus cycle |
-| `d03199f` | —    | orca.md status update |
-| `03b1105` | —    | Docs: stale-ref fixes + Phase 2-6 plan files |
-| `d8f502e` | 1.A.4b | `SettingsWriter` port + `FileSettingsProvider::write` (atomic tmp→rename). 20 tests. |
-| `f590b7b` | 1.D.3 | `LayoutSnapshot` + `LayoutRepo` + `MuxRouter::snapshot/restore`. 67 tests. |
-| `c860874` | 1.E.1-4 | OSC 133 FTCS consumer, `Confidence` enum, `BlockBuilder`, `BlockAction`, fixture tests. 32 tests. |
-| `d63b18a` | 1.F.1-4 | `ResourceSampler`, `DxgiVramSampler`, `DashboardViewModel`, Windows+stub impl. 25 tests. |
-| `5d494a0` | 1.G.1-4 | `SqliteStore` (WAL + all 8 repo traits), sidecar chunk writer (BLAKE3), crash recovery scan, `xtask cleanup-chunks` real impl. 22 tests. |
-| `c3f2cbb` | —    | orca.md + handoff.md session 1 update |
-| `a61c906` | 1.B.3 (gitlink) | Gitlink `vendor/wezterm` at `5046fc225992db6ba2ef8812743fadfdfe4b184a` (mode 160000). |
-| `9913f9a` | 1.B.3 (wire) | `WezTermAdapter::ingest_bytes` → `wezterm_term::Terminal::advance_bytes`. `BongtermConfig` minimal `TerminalConfiguration`. Root workspace excludes `vendor/wezterm`. 11 tests. |
-| `339244b` | —    | orca.md + handoff.md phase-complete update |
+Post-session truth (verify, don't trust): `cargo test --workspace` green;
+`cargo clippy --workspace --all-targets --all-features -- -D warnings` exit 0;
+`cargo fmt --all --check` clean.
 
-Full workspace `cargo test` = 0 failures on `master`.
+## What changed, by subsystem
 
----
+- **`bongterm-term`** (`adapter.rs`, `surface.rs`): `current_snapshot` now extracts
+  real per-run fg/bg colour + attrs via wezterm `Line::cluster` + palette
+  `resolve_fg/bg` (was hardcoded white/black/0). Added `surface::attr` bitfield and
+  `WezTermAdapter::resize`. Headless TDD: truecolor fg, bold+underline, start-col,
+  resize dims.
+- **`bongterm-render`** (`lib.rs`): `SurfaceSnapshot` is now `spans: Vec<CellSpan>`
+  + `cursor: CursorVis` (was `cells: Vec<u32>`). `prepare` builds a cosmic-text
+  **rich-text** stream with per-span fg colour + weight/slant, and injects a block
+  **cursor** glyph at the cursor cell (only at/after row content end — never shifts
+  text; mid-line cursor is a documented v1 gap). New `monospace_cell_size(font_size)`
+  (measures advance via a one-shot FontSystem, no GPU) and `grid_dims(...)` for
+  window→grid mapping. Tests for all.
+- **`bongterm-pty`** (`host.rs`): `PtyChild::resize(cols, rows)` (renamed `_master`
+  → `master`, now used).
+- **`bongterm-app`** (`terminal_app.rs`): **rewrote the I/O to event-driven.** A
+  `Subscription::run_with(shell, pane_worker)` worker owns the ConPTY child + a
+  blocking reader thread; emits `Message::Output` only when bytes arrive (idle =
+  no messages = no repaints). Keystrokes + resize flow back via a `tokio` channel
+  (`WorkerCmd::{Input,Resize}`) handed over in `Message::Ready`. The VT parser/grid
+  stays in app state (UI thread — need not be `Send`). Window `Resized` events map
+  to cols/rows via the cell metrics and reflow both the parser and the PTY.
+  `Cargo.toml`: added `tokio`.
 
-## Current state
+## Gate #6 (idle CPU) — measured, NOT yet strict-pass
 
-- **`[next]` in `orca.md`:** `1.exit` — wire §6.1 gates into CI
-- **No deferred code tasks.** All Phase 1 implementation done.
+See `docs/phase1-exit-gates.md` for the full table. Bottom line: idle CPU is
+**~0.05% all-core / ~0.6% single-core** (60s, pwsh). **Passes under all-core
+normalization, fails under single-core.** The spec doesn't pin the normalization;
+the honest target is the strict (single-core ≈ 0) reading — do **not** claim #6
+green off the all-core number.
 
----
+- iced 0.14 is `ControlFlow::Wait` (event-driven), so it is NOT a framework spin.
+- Event-driven I/O **improved** the shipped baseline (0.83% → 0.57% single-core)
+  and removed output latency, but did not reach ~0. The residual floor is repaints
+  driven by the **shell's own periodic output** (suspected pwsh PSReadLine
+  animation; **confirm with a `cmd.exe` idle measurement** — cmd doesn't animate).
+- **MEASURE FIRST, then fix (do not reverse this):** run the `cmd.exe` idle
+  measurement **before** writing any #6 fix. cmd doesn't animate, so if cmd idles
+  ~0 the floor is shell-output repaints (→ repaint-suppression is the right fix);
+  if cmd is *also* ~0.6% single-core the floor is the reader thread not parking on
+  ConPTY (→ repaint-suppression fixes nothing; fix the reader instead). The
+  pwsh-animation cause is **suspected, not verified** — building the fix on the
+  guess repeats the #6 mistake (the event-driven 100 lines didn't reach ~0 because
+  the 2000 ms result already showed a floor). The app + the 60 s PowerShell sampler
+  are ready; one measurement decides.
+- **Strict-pass fix (only after the measurement):** if shell-output repaints —
+  suppress repaints when the visible grid is unchanged (cleanest in the worker:
+  move the parser there, de-dup snapshots, send only on grid change; needs wezterm
+  `Terminal: Send` — verify). If reader-thread spin — make the ConPTY read block.
 
-## Phase 1 exit gates (CI wiring needed)
+## Next steps (priority order)
 
-Per spec §6.1 — must be green × 7 consecutive nightly runs:
+1. **Split panes — gate #7** (the user's stated next goal). Foundation is in place:
+   the PTY worker is already keyed for `run_with`, and resize/cell-metrics exist.
+   Plan: app state holds N panes (each: `WezTermAdapter` + snapshot + `WorkerCmd`
+   sender), a `bongterm-mux::InMemoryMux` for layout, `active_pane`. `subscription()`
+   returns one worker per pane keyed by `(pane_id, shell)`. `Message` gains a pane
+   id on `Ready`/`Output`. `view()` lays panes out per mux `Rect` (iced row/column
+   of shader widgets). Keybindings: split H/V, focus-next. Per-pane cols/rows from
+   the pane rect × cell metrics. **Interactive — verify each step in the GUI.**
+   Heads-up: the first step is an all-or-nothing single→N restructure of
+   boot/update/view/subscription/Message — no sub-slice of it compiles-and-runs,
+   so it wants a fresh context budget. Also: a pane whose shell **exits** currently
+   just freezes its last snapshot (fine for single-pane v1); multi-pane needs
+   dead-pane handling (e.g. a "pane exited" banner + close/restart).
+2. **Resource dashboard — gate #17.** The worker now has `child.pid`; surface it
+   (e.g. extend `Message::Ready` with the pid) so `bongterm-ledger` can sample the
+   pane's process tree. Build `CurrentProcessSampler::register_pid` **with** this
+   wiring (its per-pane PID→pane contract is integration-defined — don't build it
+   standalone). Then the dashboard view-model + a panel in the app.
+3. **#6 strict-pass** — run the `cmd.exe` isolation measurement **first** (it
+   decides whether the fix is repaint-suppression or a reader-thread fix; see
+   §"Gate #6"), then apply the indicated fix. Do not build the fix on the
+   unverified pwsh-animation guess.
+4. **Background quad pass (deferred):** cell backgrounds + reverse-video + a
+   quad-based cursor. Gate-irrelevant; needs the advance-measured NDC overlay
+   (`monospace_cell_size` already gives the advance). Verify alignment at col 79.
+5. **#4 / #5-full / #2 / #3:** cold-start-to-first-frame, full-app RSS + DXGI VRAM,
+   keystroke-to-glyph p99, throughput — measurement harnesses (need display/GPU).
+6. **Confirm CI for real:** the trigger is fixed (`d90f0b6`); push / open a PR so
+   `ci.yml` + `nightly.yml` actually run on `windows-latest`. The 7-nightly clock
+   for the Phase-1 exit can't start until they do. **This is the true long-pole.**
 
-| Gate | Description | Where to wire |
-|------|-------------|---------------|
-| #1 | keystroke-to-glyph p99 ≤ 5 ms | benchmark harness → CI |
-| #4 | terminal bytes/s throughput | benchmark harness → CI |
-| #5 | RSS ≤ 200 MB steady-state | integration test → CI |
-| #6 | VRAM budget compliance | `DxgiVramSampler` → CI |
-| #7 | shell integration confidence grading | `BlockBuilder` fixture → CI |
-| #8 | block actions available for High/Medium blocks | `BlockAction` test → CI |
-| #17 | settings persist across restart | `FileSettingsProvider` roundtrip → CI |
-| #28 | layout restore on launch | `LayoutRepo` + `MuxRouter::restore` → CI |
-| #29 | resource dashboard shows live values | `DashboardViewModel` → CI |
+## Shape notes / discipline
 
-These are CI checks, not new code. Wire into `.github/workflows/` (skeleton exists).
-
----
-
-## Key architectural decisions (Phase 1)
-
-- **`LayoutSnapshot` topology-only** — rects + focus indices; per-pane cwd/shell in `WorkspaceSnapshot` (bongterm-app). Module ownership matrix binding.
-- **`SqliteStore` uses `unsafe impl Send + Sync`** — `Mutex<Connection>` sound; `Connection` is `!Send` only for thread-local SQLite error state.
-- **No FK REFERENCES in `0001_init.sql`** — conformance tests don't pre-insert parent rows.
-- **Sidecar frame**: `[u64 monotonic_id][u8;32 blake3][u32 len][payload]`. Hash mismatch = torn write; reader stops cleanly.
-- **`CommandBlock.command` always `""`** — PTY input capture deferred. OSC 133 gives prompt boundaries, not typed command.
-- **`vendor/wezterm` gitlink** (mode 160000, `5046fc22`). Root workspace `exclude = ["vendor/wezterm"]` prevents nested-workspace conflict.
-- **`visible_lines` is `#[cfg(test)]` in wezterm-term** — external consumers use `lines_in_phys_range(0..N)`. Fresh terminal has no scrollback so phys-row 0 = visible row 0.
-- **`BongtermConfig`** minimal `TerminalConfiguration`: only `color_palette` required; writer is `Box::new(std::io::sink())` (ConPTY handles input at a higher layer).
-
----
-
-## Phase 2 plan ready
-
-`docs/superpowers/plans/2026-05-29-bongt-phase2.md` — 17 tasks (agent observability: adapters, transcript writer, approval queue, replay, lifecycle controls, prompt-injection corpus).
-
----
+- Renderer/GUI changes are **verified interactively** (human runs the app), never
+  committed blind. Keep this for panes/dashboard.
+- Do **not** fake-green the display/GPU gates (#4, #5-full, #6 strict, #7, #17) from
+  headless harnesses. They need a real window + a human.
+- "Finish" = `1.exit`→`6.exit` + 30-working-day dogfood + external beta + trademark.
+  Many sessions; calendar- and human-bound. This session advanced the spine; it did
+  not (and could not) finish the product.
 
 ## Key artifacts
 
 | Artifact | Path |
 |----------|------|
 | Task authority | `orca.md` |
-| Authoritative spec | `docs/PRD/bongterm_prd_v7.md` |
-| Design doc (gate numbering) | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` |
-| Phase 1 plan | `docs/superpowers/plans/2026-05-28-bongt-phase1.md` |
-| Phase 2 plan | `docs/superpowers/plans/2026-05-29-bongt-phase2.md` |
-| ADRs (0003–0007, all Accepted) | `docs/adr/` |
-| wezterm-term adapter | `crates/bongterm-term/src/adapter.rs` |
+| Gate triage + #6 baseline | `docs/phase1-exit-gates.md` |
+| Ground-truth audit | `SHIP-READINESS.md` |
+| Canonical gate criteria | `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` §6.1 |
+| CI | `.github/workflows/ci.yml`, `nightly.yml` |
 
----
-
-## Recommended next actions
-
-1. **`1.exit`** — wire §6.1 gates into `.github/workflows/`. Benchmarks #1/#4 need criterion harness; integration tests #17/#28/#29 need fixture runners; resource gates #5/#6 need sampler-driven assertions.
-
-2. **Phase 2** — invoke `superpowers:subagent-driven-development` or `superpowers:executing-plans` against `docs/superpowers/plans/2026-05-29-bongt-phase2.md`.
-
----
-
-*Generated 2026-05-29. All changes on `master`. No sensitive data.*
+*Generated 2026-06-01. All changes on `master`, not pushed. No sensitive data.*

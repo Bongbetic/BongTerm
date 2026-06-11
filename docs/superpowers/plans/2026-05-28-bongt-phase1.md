@@ -102,4 +102,121 @@ The `engineer` workspace adds these planning constraints for Phase 1 and future 
 
 ## Immediate Next Action
 
-Start with `1.UX.1` and build the full UX contract set (`1.UX.1`-`1.UX.10`) under `docs/ux/`.
+### Corrective reopen: `1.R.1` runtime shell correction
+
+Context: local gate tests were green, but the running binary regressed to the
+temporary one-pane `terminal_app` path and bypasses the PRD shell chrome in
+`bongterm-ui`.
+
+Files:
+- `crates/bongterm-app/src/lib.rs`
+- `crates/bongterm-app/src/main.rs`
+- `crates/bongterm-app/src/terminal_app.rs`
+- `crates/bongterm-app/src/shell_app.rs`
+- `crates/bongterm-app/tests/shell_app.rs`
+- `crates/bongterm-ui/src/lib.rs`
+
+RED:
+- Add a test proving `bongterm-app` exposes a composed app that boots both the
+  `bongterm-ui` shell regions and the live terminal runtime.
+
+GREEN:
+- Add a composition-root app in `bongterm-app` that owns `BongTermShell` plus
+  the existing `TerminalApp`.
+- Make the binary entrypoint run the composed app.
+- Add a `bongterm-ui` shell view path that accepts a caller-provided terminal
+  surface element instead of rendering the placeholder terminal label.
+
+Acceptance:
+- `cargo test -p bongterm-app shell_app`
+- `cargo test -p bongterm-ui`
+- `cargo run -p bongterm-app` opens a window titled `BongTerm - workspace` with
+  shell chrome and a live terminal surface.
+
+### Corrective reopen: `1.R.2` panel data correction
+
+Status: completed on 2026-06-11.
+
+Context: `1.R.1` restored the PRD shell chrome around the live terminal, but
+the side panels still render placeholder labels: `Agents collapsed` and
+`Resources collapsed`.
+
+Files:
+- `crates/bongterm-app/Cargo.toml`
+- `crates/bongterm-app/src/shell_app.rs`
+- `crates/bongterm-app/tests/shell_app.rs`
+- `crates/bongterm-ui/src/lib.rs`
+
+RED:
+- Add a test proving `BongTermApp` exposes real panel view-model snapshots:
+  an agent-sidebar snapshot from `bongterm-ui::agent_sidebar::AgentSidebarVm`
+  and a resource-dashboard snapshot with at least the BongTerm host process.
+
+GREEN:
+- Add UI-local resource dashboard DTOs to `bongterm-ui` so the UI does not
+  depend on `bongterm-ledger`.
+- Render `AgentSidebarVm::view()` in the agent panel.
+- Render the UI-local resource dashboard VM in the resource panel.
+- Translate `bongterm-ledger::DashboardViewModel` into the UI-local DTO in
+  `bongterm-app`.
+
+Acceptance:
+- `cargo test -p bongterm-app --test shell_app`
+- `cargo test -p bongterm-ui`
+- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings`
+- `cargo run -p bongterm-app` opens the composed shell with panel data instead
+  of placeholder panel labels.
+
+Stop after `1.R.2` was honored. Later PRD feature actions remain separate.
+
+### Corrective reopen: `1.R.3` resize/layout correction
+
+Status 2026-06-11: COMPLETE. The composed app now routes window resize through
+shell-owned center-pane layout metrics and resizes terminal PTY/parser/grid
+state from terminal surface bounds instead of the full window.
+
+Context: `1.R.2` renders live side-panel data, but the terminal runtime still
+uses the top-level window resize event to compute PTY/grid dimensions. With
+shell chrome and side panels visible, the terminal grid must be sized from the
+actual center-pane bounds, not the whole window.
+
+Files:
+- `crates/bongterm-app/src/shell_app.rs`
+- `crates/bongterm-app/src/terminal_app.rs`
+- `crates/bongterm-app/tests/shell_app.rs`
+- `crates/bongterm-ui/src/lib.rs`
+
+RED:
+- Add a test proving the composed app converts a shell content/window size into
+  terminal center-pane grid dimensions after subtracting shell chrome, padding,
+  and side-panel widths.
+
+GREEN:
+- Move terminal resize calculation behind an app/shell-owned layout helper that
+  receives the terminal center-pane dimensions.
+- Route resize messages so the terminal parser and PTY receive dimensions based
+  on the center pane only.
+- Keep panel rendering and `bongterm-ui` DTO boundaries unchanged.
+
+Acceptance:
+- `cargo test -p bongterm-app --test shell_app`
+- `cargo test -p bongterm-ui`
+- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings`
+- Resizing the running app keeps terminal text/grid aligned inside the center
+  pane without side-panel overlap or excessive blank columns.
+
+`1.R.3` local verification:
+- RED: `cargo test -p bongterm-app --test shell_app` failed with missing
+  `terminal_surface_size_for_window` and `AppMessage::WindowResized`.
+- GREEN: `cargo test -p bongterm-app --test shell_app` — pass, 3 tests.
+- `cargo test -p bongterm-ui` — pass, 46 tests.
+- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings` — pass.
+- `cargo build -p bongterm-app` — pass.
+- `cargo fmt --all -- --check` — pass.
+- `git diff --check` — pass.
+- Manual resize smoke opened `target\debug\bongterm-app.exe`, resized to
+  `900x600` and `1200x720`, and remained responsive.
+
+Release pipeline mode supersedes the old stop-after-session instruction only
+after status docs are updated and blocker checks pass. Later PRD feature actions
+remain blocked by their release gates.

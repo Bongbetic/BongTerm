@@ -1,14 +1,18 @@
-//! bongterm-vault-windows
-//!
-//! See `docs/superpowers/specs/2026-05-27-bongt-mvp0-design.md` §1.2 for the
-//! ownership matrix entry that governs what this crate may and may not own.
+//! bongterm-vault-windows — DPAPI / Credential Manager `SecretStore`.
+//! See spec §1.2 ownership matrix + §37 secrets reference model.
 
-#![forbid(unsafe_code)]
+#![cfg_attr(not(windows), forbid(unsafe_code))]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+pub mod vault;
+
+#[cfg(windows)]
+pub mod credman;
+#[cfg(windows)]
+pub mod dpapi;
+
+#[cfg(windows)]
+pub use credman::CredManBackend;
+pub use vault::{EnvImport, InMemoryBackend, LaunchDisclosure, VaultBackend, WindowsVault};
