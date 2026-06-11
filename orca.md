@@ -42,7 +42,7 @@
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-03, phase-5 closeout committed; phase-6 prep added)
+### Current status (2026-06-11, phase-5 closeout PR CI green; phase-6 blocked)
 
 Committed closeout: `d221e06 feat(phase5): close hardening release prep` on
 branch `codex/phase5-hardening-closeout`. Worktree metadata was pruned and the
@@ -69,6 +69,12 @@ at `target/msix/BongTerm.msix` with public cert `target/msix/BongTerm-Dev.cer`.
 This enables local/tester smoke, but it is not an OV-signed public release
 artifact and does not satisfy clean-VM public-release proof.
 
+PR CI proof update: PR #1 `correctness` run `27318475490` passed on 2026-06-11
+after commit `2cc345a fix(app): keep startup off font probing`. The previous
+`gate04_cold_start_boot_path_stays_under_budget` CI failure was caused by app
+startup synchronously probing system fonts; app boot now uses deterministic
+startup cell metrics and leaves real shaping to the renderer.
+
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
 #7 split/focus cycle, and #17 registered pane-process attribution are green locally.
@@ -94,11 +100,10 @@ Latest local verification:
 
 ### Next actionables (priority order)
 
-1. **PR CI proof** — monitor PR #1 until CI is green.
-2. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
-3. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-4. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
-5. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
+1. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
+2. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+3. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
+4. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 
@@ -262,7 +267,7 @@ Gates: spec §6.1 #18, #20, #21, #25, #26, #30.
 
 Gates: spec §6.1 #22 + §6.6 ship-when checklist.
 
-- [next][block] 6.A.1 Begin Stage A: BongT as default terminal; daily log in `docs/dogfood/<date>.md` *(blocked on Phase 5 external smoke/nightly proof)*
+- [next][block] 6.A.1 Begin Stage A: BongT as default terminal; daily log in `docs/dogfood/<date>.md` *(blocked on Phase 5 clean-VM smoke proof + 7 remote nightlies)*
 - 6.A.2 Stage A workload minimums (per spec §6.2): ≥1 long-running cmd/wk, ≥1 explainer use/wk, ≥1 Cmd-K use/wk, ≥1 shell switch/wk, ≥1 agent run/working-day, ≥1 MCP session/wk if MCP shipped, ≥1 crash drill/wk
 - 6.A.3 Stage A exit: 30 working days; zero P0/P1 defects; zero confirmed secret leaks
 - 6.B.1 Recruit Stage B users (r/rust, r/PowerShell, r/commandline, ex-colleagues) — 3-5 people / 14 days
