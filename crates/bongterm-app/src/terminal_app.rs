@@ -64,6 +64,8 @@ pub enum Message {
     Input(Vec<u8>),
     /// Window resized to the given logical `(width, height)`.
     Resized(f32, f32),
+    /// Terminal surface resized to the given logical `(width, height)`.
+    SurfaceResized(f32, f32),
 }
 
 impl TerminalApp {
@@ -103,43 +105,19 @@ impl TerminalApp {
                     let _ = tx.try_send(WorkerCmd::Input(bytes));
                 }
             }
-            Message::Resized(width, height) => {
-                // Map the window's content area (minus padding) to a cell grid and,
-                // if it changed, reflow both the local parser and the child PTY.
-                let content_w = (width - 2.0 * PADDING).max(1.0);
-                let content_h = (height - 2.0 * PADDING).max(1.0);
-                let (cols, rows) =
-                    bongterm_render::grid_dims(content_w, content_h, self.cell_w, self.cell_h);
-                if cols != self.cols || rows != self.rows {
-                    self.cols = cols;
-                    self.rows = rows;
-                    self.adapter.resize(u32::from(cols), u32::from(rows));
-                    self.snapshot = to_render_snapshot(&self.adapter.current_snapshot());
-                    if let Some(tx) = &self.input {
-                        let _ = tx.try_send(WorkerCmd::Resize { cols, rows });
-                    }
-                }
+            Message::Resized(width, height) | Message::SurfaceResized(width, height) => {
+                self.resize_to_surface(width, height);
             }
         }
         Task::none()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        // Event-driven PTY worker (no idle timer) + raw keyboard events.
-        let worker = Subscription::run_with(default_shell(), pane_worker);
-        let events = event::listen_raw(|raw, _status, _window| match raw {
-            Event::Keyboard(keyboard::Event::KeyPressed {
-                key,
-                text,
-                modifiers,
-                ..
-            }) => key_to_bytes(&key, text.as_deref(), modifiers).map(Message::Input),
-            Event::Window(iced::window::Event::Resized(size)) => {
-                Some(Message::Resized(size.width, size.height))
-            }
-            _ => None,
-        });
-        Subscription::batch([worker, events])
+        Subscription::batch([worker_subscription(), event_subscription_with_resize()])
+    }
+
+    pub fn subscription_without_resize(&self) -> Subscription<Message> {
+        Subscription::batch([worker_subscription(), event_subscription_without_resize()])
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -165,6 +143,31 @@ impl TerminalApp {
     }
 
     #[must_use]
+    pub const fn grid_size(&self) -> (u16, u16) {
+        (self.cols, self.rows)
+    }
+
+    pub fn resize_to_surface(&mut self, width: f32, height: f32) {
+        let content_w = (width - 2.0 * PADDING).max(1.0);
+        let content_h = (height - 2.0 * PADDING).max(1.0);
+        let (cols, rows) =
+            bongterm_render::grid_dims(content_w, content_h, self.cell_w, self.cell_h);
+        self.resize_grid(cols, rows);
+    }
+
+    fn resize_grid(&mut self, cols: u16, rows: u16) {
+        if cols != self.cols || rows != self.rows {
+            self.cols = cols;
+            self.rows = rows;
+            self.adapter.resize(u32::from(cols), u32::from(rows));
+            self.snapshot = to_render_snapshot(&self.adapter.current_snapshot());
+            if let Some(tx) = &self.input {
+                let _ = tx.try_send(WorkerCmd::Resize { cols, rows });
+            }
+        }
+    }
+
+    #[must_use]
     pub const fn theme(&self) -> Theme {
         Theme::Dark
     }
@@ -172,6 +175,51 @@ impl TerminalApp {
     #[must_use]
     pub fn title(&self) -> String {
         "BongTerm".to_string()
+    }
+}
+
+fn worker_subscription() -> Subscription<Message> {
+    Subscription::run_with(default_shell(), pane_worker)
+}
+
+fn event_subscription_with_resize() -> Subscription<Message> {
+    event::listen_raw(terminal_event_with_resize)
+}
+
+fn event_subscription_without_resize() -> Subscription<Message> {
+    event::listen_raw(terminal_event_without_resize)
+}
+
+fn terminal_event_with_resize(
+    raw: Event,
+    _status: event::Status,
+    _window: iced::window::Id,
+) -> Option<Message> {
+    match raw {
+        Event::Window(iced::window::Event::Resized(size)) => {
+            Some(Message::Resized(size.width, size.height))
+        }
+        raw => terminal_keyboard_event(raw),
+    }
+}
+
+fn terminal_event_without_resize(
+    raw: Event,
+    _status: event::Status,
+    _window: iced::window::Id,
+) -> Option<Message> {
+    terminal_keyboard_event(raw)
+}
+
+fn terminal_keyboard_event(raw: Event) -> Option<Message> {
+    match raw {
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key,
+            text,
+            modifiers,
+            ..
+        }) => key_to_bytes(&key, text.as_deref(), modifiers).map(Message::Input),
+        _ => None,
     }
 }
 

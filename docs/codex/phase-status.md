@@ -1,18 +1,49 @@
-# BongTerm Phase 5 Status
+# BongTerm Runtime Correction Status
 
 Source of truth:
 
-- Plan: `docs/superpowers/plans/2026-05-29-bongt-phase5.md`
+- Plan: `docs/superpowers/plans/2026-05-28-bongt-phase1.md`
 - Product intent: `docs/PRD/bongterm_prd_v7.md`
 - Execution control plane: `orca.md`
 
-Current focus: **Phase 5 local implementation complete and PR CI green; Phase 6 dogfood start remains blocked** on 2026-06-11.
+Current focus: **Release pipeline mode active; Phase 1 runtime correction
+locally complete; release proof unblock next** on 2026-06-11.
+
+Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
+chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
+release pipeline mode: continue sequential planned tasks in one session only
+after each task has its RED/GREEN checks, required verification, status updates,
+and blocker assessment. This does not relax external/manual release gates.
+
+Completed tasks: `1.R.1`, `1.R.2`, and `1.R.3` runtime correction. The running
+binary composes `bongterm-ui` shell chrome with the existing live terminal
+runtime, renders `AgentSidebarVm::view()` in the agent panel, renders a UI-local
+resource dashboard DTO translated from `bongterm-ledger::DashboardViewModel`,
+and routes composed-app resize through shell-owned center-pane surface sizing
+before resizing terminal PTY/parser/grid state.
+
+Next task: release proof unblock — inspect default/local workflow state, add or
+repair tag-gated release workflow support if missing, and prepare the push/merge
+path required to start remote nightly/release proof.
+
+Last verification:
+
+- RED: `cargo test -p bongterm-app --test shell_app` failed with missing `terminal_surface_size_for_window` and `AppMessage::WindowResized` for `1.R.3`.
+- GREEN: `cargo test -p bongterm-app --test shell_app` — pass, 3 tests.
+- `cargo test -p bongterm-ui` — pass, 46 tests.
+- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings` — pass; vendored wezterm warnings still print from dependencies.
+- `cargo build -p bongterm-app` — pass.
+- `cargo fmt --all -- --check` — pass; stable rustfmt still prints existing nightly-only config warnings.
+- `git diff --check` — pass.
+- Manual resize smoke: `target\debug\bongterm-app.exe` opened responding PID `26696`, title `BongTerm - workspace`; Win32 resize to `900x600` and `1200x720` left the process responsive.
 
 Commit: `d221e06 feat(phase5): close hardening release prep`
 
 Branch: `codex/phase5-hardening-closeout`
 
-Phase 1 exit closure: local gates #1,#4-8,#17,#28,#29 are green. The remaining Phase 1 exit proof is the required 7 consecutive remote nightlies.
+Phase 1 exit closure: local gates #1,#4-8,#17,#28,#29 are green and runtime
+correction is locally complete through `1.R.3`. The remote exit proof is still
+the required 7 consecutive remote nightlies.
 
 Phase 2 exit closure: local gates #15 and #24 are green and wired into nightly. The remaining Phase 2 exit proof is the required 7 consecutive remote nightlies.
 
@@ -37,4 +68,10 @@ Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.c
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
 | Workspace gates | Green | PR #1 `correctness` run `27318475490` (pass); local targeted checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render`, `cargo test -p bongterm-app -j 1` | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
 
-Next task: 6.A.1 remains blocked and not executable until Phase 5 clean-VM signed install smoke proof and 7 consecutive remote nightly CI green runs are accepted or completed (last checked 2026-06-11T07:56:30+05:30). Phase 6 public-release exit remains blocked until external Phase 5 clean-VM smoke, 7 remote nightlies, legal/trademark ADRs, signed release `dist/`, Stage A/B dogfood, public flip, and GitHub release complete.
+Next task: release proof unblock is actionable locally. `6.A.1` remains blocked
+and not executable until Phase 5 clean-VM signed install smoke proof and 7
+consecutive remote nightly CI green runs are accepted or completed (last checked
+2026-06-11T07:56:30+05:30). Phase 6 public-release exit remains blocked until
+external Phase 5 clean-VM smoke, 7 remote nightlies, legal/trademark ADRs,
+signed release `dist/`, Stage A/B dogfood, public flip, and GitHub release
+complete.

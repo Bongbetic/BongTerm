@@ -8,6 +8,14 @@
 > - `[next]` = next actionable task
 > - `[block]` = blocked on a dependency named in parens
 > - no prefix = not yet the next item
+>
+> **Release pipeline mode.** User approved the public `v0.1.0-mvp0` ship plan
+> on 2026-06-11. While that plan is active, Codex may continue through
+> sequential planned tasks in one session, but only one task at a time: each
+> task must complete its RED/GREEN checks, required verification, status updates,
+> and blocker assessment before the next task starts. External time/manual gates
+> such as clean-VM signed smoke, 7 remote nightlies, and dogfood remain hard
+> blockers and must not be faked or compressed.
 
 ---
 
@@ -35,14 +43,30 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — gates #1,#4-8,#17,#28,#29 have local automated coverage; Phase 1 exit test `phase1_exit_gates` is green on **2026-06-03**. Required 7-nightly streak still needs remote CI time. | — | §6.1 #1,#4-8,#17,#28,#29 green × 7 nightlies |
+| **Phase 1** Usable Terminal | ✅ **LOCAL RUNTIME CORRECTION GREEN / REMOTE NIGHTLY BLOCKED** — corrective tasks `1.R.1`-`1.R.3` are complete locally; the composed runtime now sizes terminal grid/PTY/parser state from the shell center pane instead of the whole window. | — | §6.1 Phase 1 gates remain blocked only on required 7 consecutive remote nightlies. |
 | **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-11, phase-5 closeout PR CI green; phase-6 blocked)
+### Current status (2026-06-11, release pipeline mode active; Phase 1 runtime correction locally complete; release proof unblock next)
+
+Workflow update: `AGENTS.md`, this file, and `docs/codex/phase-status.md` now
+allow controlled release pipeline mode for the approved public `v0.1.0-mvp0`
+plan. This changes execution cadence only; it does not relax RED/GREEN,
+verification, architecture, security, dogfood, clean-VM, or remote-nightly
+release gates.
+
+Runtime correction update: Phase 1 corrective tasks `1.R.1`, `1.R.2`, and
+`1.R.3` are complete locally. The app entrypoint runs a composed `BongTermApp`
+that places the existing live terminal runtime inside `bongterm-ui` shell
+chrome, renders the agent sidebar view-model, renders a `bongterm-ledger`
+resource dashboard snapshot translated through UI-local DTOs, and routes window
+resize events through shell-owned center-pane sizing before resizing the terminal
+PTY/parser/grid. Manual resize smoke opened PID `26696`, title
+`BongTerm - workspace`, resized to `900x600` and `1200x720`, and remained
+responsive.
 
 Committed closeout: `d221e06 feat(phase5): close hardening release prep` on
 branch `codex/phase5-hardening-closeout`. Worktree metadata was pruned and the
@@ -89,9 +113,12 @@ wiring are present.
 
 Latest local verification:
 
+- `cargo test -p bongterm-app --test shell_app` — pass, 3 tests.
+- `cargo test -p bongterm-ui` — pass, 46 tests.
+- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings` — pass; vendored wezterm warnings still print from dependencies.
+- `cargo build -p bongterm-app` — pass.
 - `cargo fmt --all -- --check` — pass
-- `cargo clippy --all-targets --all-features --workspace -- -D warnings` — pass
-- `cargo test --workspace` — pass
+- `git diff --check` — pass
 - `cargo run -p xtask -- package-msix` — pass
 - `cargo run -p xtask -- sbom` — pass
 - `cargo run -p xtask -- attestation` — pass
@@ -100,10 +127,11 @@ Latest local verification:
 
 ### Next actionables (priority order)
 
-1. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
-2. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-3. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
-4. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
+1. **[next] Release proof unblock** — inspect local/default-branch workflow state, add or repair `release.yml` if missing, and prepare the push/merge path needed to start remote nightly/release proof.
+2. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
+3. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+4. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
+5. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 
@@ -177,6 +205,9 @@ Phase 6 (Dogfood → Public)
 > Context for the re-plan: ADR-005 (Iced Shader widget), ADR-003 (wgpu latency confirmed), ADR-004 (atlas eviction), ADR-007 (wezterm-term API surface at `crates/bongterm-term/src/adapter.rs`).
 
 Gates this phase satisfies: spec §6.1 #1, #4, #5, #6, #7, #8, #17, #28, #29.
+
+All corrective reopen tasks `1.R.1`-`1.R.3` are locally complete as of
+2026-06-11. Release proof now moves through the top-level action queue above.
 
 **Prerequisite — UX Contract artifacts under `docs/ux/`** (spec §9):
 

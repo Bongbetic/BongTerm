@@ -39,7 +39,7 @@ cargo xtask package-msix
 cargo xtask sbom
 cargo xtask check-licenses
 cargo xtask checksums dist
-cargo xtask attestation
+cargo xtask attestation --subject dist/BongTerm-0.1.0-mvp0-x64.msix --out dist/attestation.intoto.jsonl
 cargo xtask release-verify dist
 cargo xtask site-check site
 ```

@@ -42,7 +42,14 @@ enum Cmd {
     /// Produce signed MSIX artifact (Phase 5).
     PackageMsix,
     /// Emit SLSA provenance attestation.
-    Attestation,
+    Attestation {
+        /// Subject artifact to attest.
+        #[arg(long, default_value = "Cargo.lock")]
+        subject: PathBuf,
+        /// Output path for the in-toto JSONL statement.
+        #[arg(long, default_value = "attestation.intoto.jsonl")]
+        out: PathBuf,
+    },
     /// Emit SHA-256 sidecars and combined checksums.txt over a dist directory.
     Checksums {
         /// Dist directory to checksum.
@@ -75,7 +82,7 @@ fn main() -> Result<()> {
         Cmd::PromptInjectionCorpus => prompt_injection_corpus::run(),
         Cmd::CleanupChunks => cleanup_chunks::run(),
         Cmd::PackageMsix => package_msix::run(),
-        Cmd::Attestation => attestation::run(),
+        Cmd::Attestation { subject, out } => attestation::run(&subject, &out),
         Cmd::Checksums { dir } => checksums::run(&dir),
         Cmd::ReleaseVerify { dir } => release_verify::run(&dir),
         Cmd::SiteCheck { dir } => site_check::run(&dir),

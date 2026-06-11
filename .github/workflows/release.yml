@@ -1,0 +1,163 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v0.1.0-mvp0"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish"
+        required: true
+        default: "v0.1.0-mvp0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-v0.1.0-mvp0
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  DIST_DIR: dist
+  RELEASE_TAG: v0.1.0-mvp0
+  RELEASE_VERSION: 0.1.0-mvp0
+  MSIX_NAME: BongTerm-0.1.0-mvp0-x64.msix
+  TIMESTAMP_URL: http://timestamp.digicert.com
+
+jobs:
+  release:
+    name: signed release artifact set
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Validate release trigger and signing inputs
+        shell: pwsh
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          SIGNING_CERT_BASE64: ${{ secrets.BONGT_SIGNING_CERT_BASE64 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.BONGT_SIGNING_CERT_PASSWORD }}
+        run: |
+          $tag = if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME }
+          if ($tag -ne $env:RELEASE_TAG) {
+            throw "release workflow is locked to $env:RELEASE_TAG; got $tag"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_BASE64)) {
+            throw "missing BONGT_SIGNING_CERT_BASE64 secret"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
+            throw "missing BONGT_SIGNING_CERT_PASSWORD secret"
+          }
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+          components: rustfmt,clippy
+
+      - name: Build release executable
+        run: cargo build --release -p bongterm-app
+
+      - name: Package MSIX
+        run: cargo xtask package-msix
+
+      - name: Import signing certificate
+        shell: pwsh
+        env:
+          SIGNING_CERT_BASE64: ${{ secrets.BONGT_SIGNING_CERT_BASE64 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.BONGT_SIGNING_CERT_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "bongterm-signing.pfx"
+          [System.IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+          $password = ConvertTo-SecureString $env:SIGNING_CERT_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password | Select-Object -First 1
+          if (-not $cert.Thumbprint) {
+            throw "signing certificate import did not return a thumbprint"
+          }
+          "BONGT_SIGN_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Remove-Item -LiteralPath $pfx -Force
+
+      - name: Sign and verify MSIX
+        shell: pwsh
+        run: |
+          $msix = "target/msix/BongTerm.msix"
+          if (-not (Test-Path $msix)) {
+            throw "missing $msix"
+          }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $msix))
+          $placeholder = [System.Text.Encoding]::UTF8.GetString($bytes)
+          if ($placeholder -like "MSIX placeholder*") {
+            throw "package-msix produced a placeholder; Windows SDK makeappx is required for release"
+          }
+          $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
+          & $signtool sign /fd SHA256 /sha1 $env:BONGT_SIGN_THUMBPRINT /tr $env:TIMESTAMP_URL /td SHA256 $msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool sign failed" }
+          & $signtool verify /pa /v $msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool verify failed" }
+
+      - name: Assemble dist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:DIST_DIR | Out-Null
+          Copy-Item -LiteralPath "target/msix/BongTerm.msix" -Destination "$env:DIST_DIR/$env:MSIX_NAME" -Force
+          $cert = Get-Item "Cert:\CurrentUser\My\$env:BONGT_SIGN_THUMBPRINT"
+          Export-Certificate -Cert $cert -FilePath "$env:DIST_DIR/$env:MSIX_NAME.cer" | Out-Null
+
+          cargo xtask sbom
+          cargo xtask check-licenses
+          cargo xtask bench-report --gate
+
+          Copy-Item -LiteralPath "sbom.cdx.json" -Destination "$env:DIST_DIR/sbom.cdx.json" -Force
+          Copy-Item -LiteralPath "THIRD_PARTY_NOTICES.md" -Destination "$env:DIST_DIR/THIRD_PARTY_NOTICES.md" -Force
+          Copy-Item -LiteralPath "benchmark-report.md" -Destination "$env:DIST_DIR/benchmark-report.md" -Force
+          Copy-Item -LiteralPath "CHANGELOG.md" -Destination "$env:DIST_DIR/CHANGELOG.md" -Force
+          Copy-Item -LiteralPath "known-issues.md" -Destination "$env:DIST_DIR/known-issues.md" -Force
+          Copy-Item -LiteralPath "SECURITY.md" -Destination "$env:DIST_DIR/SECURITY.md" -Force
+          Copy-Item -LiteralPath "INSTALL.md" -Destination "$env:DIST_DIR/INSTALL.md" -Force
+
+      - name: Attest, checksum, and sign manifest
+        shell: pwsh
+        run: |
+          cargo xtask attestation --subject "$env:DIST_DIR/$env:MSIX_NAME" --out "$env:DIST_DIR/attestation.intoto.jsonl"
+          cargo xtask checksums $env:DIST_DIR
+
+          Add-Type -AssemblyName System.Security.Cryptography.Pkcs
+          $checksums = Join-Path $env:DIST_DIR "checksums.txt"
+          $content = [System.IO.File]::ReadAllBytes((Resolve-Path $checksums))
+          $contentInfo = [System.Security.Cryptography.Pkcs.ContentInfo]::new($content)
+          $signedCms = [System.Security.Cryptography.Pkcs.SignedCms]::new($contentInfo, $true)
+          $cert = Get-Item "Cert:\CurrentUser\My\$env:BONGT_SIGN_THUMBPRINT"
+          $signer = [System.Security.Cryptography.Pkcs.CmsSigner]::new($cert)
+          $signer.IncludeOption = [System.Security.Cryptography.X509Certificates.X509IncludeOption]::EndCertOnly
+          $signedCms.ComputeSignature($signer)
+          [System.IO.File]::WriteAllBytes("$checksums.sig", $signedCms.Encode())
+
+      - name: Verify release artifact set
+        run: cargo xtask release-verify dist
+
+      - name: Upload release artifact set
+        uses: actions/upload-artifact@v4
+        with:
+          name: bongterm-${{ env.RELEASE_VERSION }}-dist
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create or update draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = "BongTerm $env:RELEASE_TAG public MVP-0 artifact set. Publish only after clean-VM signed install proof, 7 green nightlies, dogfood, legal/name ADRs, and public-flip checklist are complete."
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG dist/* --clobber
+          } else {
+            gh release create $env:RELEASE_TAG dist/* --draft --prerelease --title "BongTerm $env:RELEASE_TAG" --notes $notes
+          }

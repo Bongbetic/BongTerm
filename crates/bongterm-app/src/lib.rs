@@ -5,6 +5,8 @@
 //! stays presentation-only. See the module ownership matrix in `CLAUDE.md`.
 
 pub mod session;
+pub mod shell_app;
 pub mod terminal_app;
 
+pub use shell_app::{AppMessage, BongTermApp};
 pub use terminal_app::{Message, TerminalApp};

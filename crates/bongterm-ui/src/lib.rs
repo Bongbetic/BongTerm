@@ -19,6 +19,101 @@ pub mod ime;
 
 pub type ShellResult = iced::Result;
 
+/// Shell outer padding in logical pixels.
+pub const SHELL_OUTER_PADDING: u16 = 12;
+/// Gap between the agent panel, terminal surface, and resource panel.
+pub const SHELL_BODY_SPACING: u16 = 8;
+/// Vertical gap between title/tab/body/status regions.
+pub const SHELL_COLUMN_SPACING: u16 = 8;
+/// Side-panel width used by both panel views.
+pub const SHELL_SIDE_PANEL_WIDTH: f32 = 220.0;
+/// Side-panel internal padding in logical pixels.
+pub const SHELL_PANEL_PADDING: u16 = 8;
+/// Fixed shell chrome heights used by the layout helper and the view.
+pub const SHELL_TITLE_BAR_HEIGHT: f32 = 24.0;
+pub const SHELL_TAB_STRIP_HEIGHT: f32 = 24.0;
+pub const SHELL_STATUS_BAR_HEIGHT: f32 = 20.0;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TerminalSurfaceSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+// ---------------------------------------------------------------------------
+// Resource dashboard view-model
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceDashboardVm {
+    pub total_rss: String,
+    pub total_cpu_pct: String,
+    pub vram: Option<String>,
+    pub rows: Vec<ResourceRowVm>,
+    pub is_stale: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceRowVm {
+    pub category: String,
+    pub pid: u32,
+    pub rss: String,
+    pub cpu_pct: String,
+}
+
+impl Default for ResourceDashboardVm {
+    fn default() -> Self {
+        Self {
+            total_rss: "0 B".to_string(),
+            total_cpu_pct: "0.0%".to_string(),
+            vram: None,
+            rows: vec![],
+            is_stale: false,
+        }
+    }
+}
+
+impl ResourceDashboardVm {
+    #[must_use]
+    pub fn view(&self) -> Element<'_, ShellMessage> {
+        let freshness = if self.is_stale { "stale" } else { "live" };
+        let vram = self.vram.as_deref().unwrap_or("Metric unavailable from OS");
+
+        let mut col = column![
+            text("Resources").size(16),
+            text(format!(
+                "RSS {} | CPU {} | {}",
+                self.total_rss, self.total_cpu_pct, freshness
+            ))
+            .size(12),
+            text(format!("VRAM {vram}")).size(12),
+        ]
+        .spacing(8);
+
+        if self.rows.is_empty() {
+            col = col.push(text("No process samples").size(12));
+        } else {
+            for row_vm in self.rows.iter().take(6) {
+                col = col.push(
+                    row![
+                        text(&row_vm.category).width(Length::Fill),
+                        text(format!("pid {}", row_vm.pid)).size(12),
+                        text(&row_vm.rss).size(12),
+                        text(&row_vm.cpu_pct).size(12),
+                    ]
+                    .spacing(6),
+                );
+            }
+        }
+
+        container(col)
+            .width(Length::Fixed(SHELL_SIDE_PANEL_WIDTH))
+            .height(Length::Fill)
+            .padding(SHELL_PANEL_PADDING)
+            .into()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Focus
 // ---------------------------------------------------------------------------
@@ -410,6 +505,8 @@ pub struct BongTermShell {
     focus: ShellFocus,
     agent_sidebar_expanded: bool,
     resource_dashboard_expanded: bool,
+    agent_sidebar: agent_sidebar::AgentSidebarVm,
+    resource_dashboard: ResourceDashboardVm,
     command_palette_open: bool,
     command_palette: CommandPalette,
     palette_state: PaletteState,
@@ -434,6 +531,11 @@ impl BongTermShell {
             focus: ShellFocus::Terminal,
             agent_sidebar_expanded: false,
             resource_dashboard_expanded: false,
+            agent_sidebar: agent_sidebar::AgentSidebarVm {
+                agents: vec![],
+                approvals: vec![],
+            },
+            resource_dashboard: ResourceDashboardVm::default(),
             command_palette_open: false,
             command_palette: CommandPalette::default(),
             palette_state: PaletteState::default(),
@@ -508,6 +610,42 @@ impl BongTermShell {
     #[must_use]
     pub fn command_palette(&self) -> &CommandPalette {
         &self.command_palette
+    }
+
+    pub fn set_panel_data(
+        &mut self,
+        agent_sidebar: agent_sidebar::AgentSidebarVm,
+        resource_dashboard: ResourceDashboardVm,
+    ) {
+        self.agent_sidebar = agent_sidebar;
+        self.resource_dashboard = resource_dashboard;
+    }
+
+    #[must_use]
+    pub fn agent_sidebar_snapshot(&self) -> &agent_sidebar::AgentSidebarVm {
+        &self.agent_sidebar
+    }
+
+    #[must_use]
+    pub const fn resource_dashboard_snapshot(&self) -> &ResourceDashboardVm {
+        &self.resource_dashboard
+    }
+
+    #[must_use]
+    pub fn terminal_surface_size_for_window(width: f32, height: f32) -> TerminalSurfaceSize {
+        let horizontal_chrome = (2.0 * f32::from(SHELL_OUTER_PADDING))
+            + (2.0 * SHELL_SIDE_PANEL_WIDTH)
+            + (2.0 * f32::from(SHELL_BODY_SPACING));
+        let vertical_chrome = (2.0 * f32::from(SHELL_OUTER_PADDING))
+            + SHELL_TITLE_BAR_HEIGHT
+            + SHELL_TAB_STRIP_HEIGHT
+            + SHELL_STATUS_BAR_HEIGHT
+            + (3.0 * f32::from(SHELL_COLUMN_SPACING));
+
+        TerminalSurfaceSize {
+            width: (width - horizontal_chrome).max(1.0),
+            height: (height - vertical_chrome).max(1.0),
+        }
     }
 
     pub fn boot() -> (Self, Task<ShellMessage>) {
@@ -622,26 +760,51 @@ impl BongTermShell {
     }
 
     fn main_view(&self) -> Element<'_, ShellMessage> {
-        let title_bar = text(self.title()).size(16);
-        let tab_strip = row![text("[PowerShell - workspace]"), text("[+]")].spacing(8);
-        let body = row![
-            shell_panel("Agents", "collapsed"),
-            container(text("Terminal surface\n\nshell prompt appears here"))
-                .width(Length::Fill)
-                .height(Length::Fill),
-            shell_panel("Resources", "collapsed")
-        ]
-        .spacing(8)
-        .height(Length::Fill);
-        let status_bar = text("shell ready | workspace | resources ok").size(12);
+        let terminal = container(text("Terminal surface\n\nshell prompt appears here"))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
+        self.view_with_terminal(terminal, std::convert::identity)
+    }
 
-        let base: Element<'_, ShellMessage> = column![title_bar, tab_strip, body, status_bar]
-            .spacing(8)
-            .padding(12)
+    pub fn view_with_terminal<'a, Message, F>(
+        &'a self,
+        terminal: Element<'a, Message>,
+        map_shell: F,
+    ) -> Element<'a, Message>
+    where
+        Message: Clone + 'a,
+        F: Fn(ShellMessage) -> Message + Copy + 'a,
+    {
+        let title_bar: Element<'a, Message> = container(text(self.title()).size(16))
+            .height(Length::Fixed(SHELL_TITLE_BAR_HEIGHT))
+            .into();
+        let tab_strip: Element<'a, Message> = container(
+            row![text("[PowerShell - workspace]"), text("[+]")]
+                .spacing(u32::from(SHELL_BODY_SPACING)),
+        )
+        .height(Length::Fixed(SHELL_TAB_STRIP_HEIGHT))
+        .into();
+        let body: Element<'a, Message> = row![
+            self.agent_sidebar.view().map(map_shell),
+            container(terminal).width(Length::Fill).height(Length::Fill),
+            self.resource_dashboard.view().map(map_shell)
+        ]
+        .spacing(u32::from(SHELL_BODY_SPACING))
+        .height(Length::Fill)
+        .into();
+        let status_bar: Element<'a, Message> =
+            container(text("shell ready | workspace | resources ok").size(12))
+                .height(Length::Fixed(SHELL_STATUS_BAR_HEIGHT))
+                .into();
+
+        let base: Element<'a, Message> = column![title_bar, tab_strip, body, status_bar]
+            .spacing(u32::from(SHELL_COLUMN_SPACING))
+            .padding(SHELL_OUTER_PADDING)
             .into();
 
         if self.command_palette_open {
-            stack![base, self.palette_overlay()].into()
+            stack![base, self.palette_overlay().map(map_shell)].into()
         } else {
             base
         }
@@ -875,13 +1038,6 @@ pub fn run_shell() -> ShellResult {
     .theme(BongTermShell::theme)
     .subscription(BongTermShell::subscription)
     .run()
-}
-
-fn shell_panel<'a>(title: &'a str, state: &'a str) -> Element<'a, ShellMessage> {
-    container(column![text(title).size(14), text(state).size(12)])
-        .width(160)
-        .height(Length::Fill)
-        .into()
 }
 
 #[cfg(test)]
