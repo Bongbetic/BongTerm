@@ -43,14 +43,14 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | ✅ **LOCAL RUNTIME CORRECTION GREEN / REMOTE NIGHTLY BLOCKED** — corrective tasks `1.R.1`-`1.R.3` are complete locally; the composed runtime now sizes terminal grid/PTY/parser state from the shell center pane instead of the whole window. | — | §6.1 Phase 1 gates remain blocked only on required 7 consecutive remote nightlies. |
-| **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY BLOCKED** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 nightlies |
+| **Phase 1** Usable Terminal | ✅ **LOCAL RUNTIME CORRECTION GREEN / REMOTE NIGHTLY 1/7** — corrective tasks `1.R.1`-`1.R.3` are complete locally; the composed runtime now sizes terminal grid/PTY/parser state from the shell center pane instead of the whole window. | — | §6.1 Phase 1 gates remain blocked until 7 consecutive remote nightlies are green. |
+| **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / REMOTE NIGHTLY 1/7** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-11, release pipeline mode active; Phase 1 runtime correction + UI follow-up locally complete; release proof unblock next)
+### Current status (2026-06-11, release pipeline mode active; release proof unblocked on default branch; nightly proof 1/7)
 
 Workflow update: `AGENTS.md`, this file, and `docs/codex/phase-status.md` now
 allow controlled release pipeline mode for the approved public `v0.1.0-mvp0`
@@ -112,6 +112,15 @@ Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now
 logs that runner-specific condition as a skip only on GitHub Actions; local and
 reference machines still require Windows PowerShell coverage.
 
+Release proof unblock update: PR #1 merged to `master` at merge commit
+`21e2feb` on 2026-06-11. Default branch now contains active `ci`, `nightly`,
+and tag-gated `release` workflows. Master CI run `27341442656` passed after the
+merge. Manual nightly run `27343029777` passed all gate steps, so remote nightly
+proof is now **1/7 green**. The next six required green nightlies remain
+time-gated and must not be compressed. The release workflow is present but still
+requires real signing secrets/certificate and a real signed `dist/` before a
+public release can be cut.
+
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
 #7 split/focus cycle, and #17 registered pane-process attribution are green locally.
@@ -142,15 +151,14 @@ Latest local verification:
 
 ### Next actionables (priority order)
 
-1. **[next] Release proof unblock** — inspect local/default-branch workflow state, add or repair `release.yml` if missing, and prepare the push/merge path needed to start remote nightly/release proof.
-2. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
-3. **External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-4. **Remote nightly proof** — wait for the required 7 consecutive green nightly runs. This cannot be collapsed into a local session.
-5. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
+1. **[next][block] External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+2. **[block] Remote nightly proof** — currently **1/7 green** (`27343029777`); wait for six more consecutive green nightly runs. This cannot be collapsed into a local session.
+3. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
+4. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 
-- **GitHub Actions remote proof** — local workflows now contain the exit gates, but 7 consecutive green nightlies are a time-bound remote proof requirement and remain external until pushed/executed.
+- **GitHub Actions remote proof** — default branch workflows now contain the exit gates and first manual nightly `27343029777` is green; the public-release proof remains blocked until the streak reaches 7/7.
 - **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: previous environment was missing `cl.exe` + `signtool.exe`; signed clean-VM smoke still depends on that external toolchain/cert environment.

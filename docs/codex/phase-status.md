@@ -6,8 +6,8 @@ Source of truth:
 - Product intent: `docs/PRD/bongterm_prd_v7.md`
 - Execution control plane: `orca.md`
 
-Current focus: **Release pipeline mode active; Phase 1 runtime correction and
-UI follow-up locally complete; release proof unblock next** on 2026-06-11.
+Current focus: **Release pipeline mode active; release proof unblocked on
+default branch; remote nightly proof 1/7** on 2026-06-11.
 
 Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
 chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
@@ -29,9 +29,13 @@ sampler establishes a first-sample baseline at `0.0%`. Manual wide visual smoke
 captured `C:\Users\souba\AppData\Local\Temp\bongterm-ui-smoke-wide-26320.png`
 with center-pane terminal alignment and readable resource metrics.
 
-Next task: release proof unblock — inspect default/local workflow state, add or
-repair tag-gated release workflow support if missing, and prepare the push/merge
-path required to start remote nightly/release proof.
+Release proof unblock is complete: PR #1 merged to `master` at merge commit
+`21e2feb` on 2026-06-11, and default branch now contains active `ci`,
+`nightly`, and tag-gated `release` workflows. Master CI run `27341442656`
+passed after the merge. Manual nightly run `27343029777` passed all gate steps,
+so remote nightly proof is **1/7 green**. The remaining six green nightlies,
+real signed `dist/`, clean-VM signed install smoke, dogfood, legal/name
+decision, public flip, and GitHub release remain hard blockers.
 
 Last verification:
 
@@ -65,10 +69,11 @@ Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-
 Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
 Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`). PR #1 `correctness` run `27318475490` passed on 2026-06-11 after commit `2cc345a fix(app): keep startup off font probing`; the prior Gate #4 CI failure was fixed by removing synchronous font probing from app boot. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. A dev-signed MSIX smoke artifact exists under `target/msix/` with public cert `target/msix/BongTerm-Dev.cer`.
 Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now skips only that runner-specific empty-stream condition on GitHub Actions; local/reference machines still require Windows PowerShell coverage.
+Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI run `27341442656` passed; first manual nightly run `27343029777` passed. Remote nightly proof is now 1/7.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
-| Phase 1 exit gates | Local green | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests) | Remote 7-nightly proof still external/time-bound. |
+| Phase 1 exit gates | Local green; remote proof 1/7 | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests); nightly run `27343029777` (pass) | Remote proof still blocked until 7/7 consecutive nightlies. |
 | UIA/accessibility | Local green | `cargo test -p bongterm-ui` (pass); `cargo test -p bongterm-test-kit` (pass) | Manual Narrator QA documented in `tests/accessibility/narrator_smoke.md`. |
 | IME + DPI | Local green | `cargo test -p bongterm-ui` (pass) | Live CJK IME QA remains manual. |
 | Renderer device loss | Local green | `cargo test -p bongterm-render device_loss` (pass) | Recovery policy falls back to software after repeated loss. |
@@ -76,12 +81,13 @@ Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Wi
 | Forbidden abstraction/EDR | Local green | `cargo test -p bongterm-security forbidden` (pass); `cargo run -p xtask -- forbidden-abstraction` (pass) | Runtime auditor and static scan are present; external Defender/EDR smoke is documented. |
 | Release packaging | Local green | `cargo run -p xtask -- package-msix` (pass) | `makeappx.exe`/real signing cert/clean VM not available in this local proof. |
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
-| Workspace gates | Green | PR #1 `correctness` run `27318475490` (pass); local follow-up checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app`, `cargo test --workspace --quiet` | Stable rustfmt warns that nightly-only rustfmt options are ignored. |
+| Workspace gates | Green | PR #1 `correctness` run `27339704976` (pass); master CI run `27341442656` (pass); local follow-up checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app`, `cargo test --workspace --quiet` | Stable rustfmt warns that nightly-only rustfmt options are ignored; GitHub warns Node.js 20 actions will need update. |
 
-Next task: release proof unblock is actionable locally. `6.A.1` remains blocked
-and not executable until Phase 5 clean-VM signed install smoke proof and 7
-consecutive remote nightly CI green runs are accepted or completed (last checked
-2026-06-11T07:56:30+05:30). Phase 6 public-release exit remains blocked until
-external Phase 5 clean-VM smoke, 7 remote nightlies, legal/trademark ADRs,
-signed release `dist/`, Stage A/B dogfood, public flip, and GitHub release
-complete.
+Next task: external release proof is blocked until a clean Windows VM, real
+signing certificate/toolchain, and signed MSIX path are available. `6.A.1`
+remains blocked and not executable until Phase 5 clean-VM signed install smoke
+proof and 7 consecutive remote nightly CI green runs are accepted or completed
+(last checked 2026-06-11T17:05:47+05:30; current nightly streak 1/7). Phase 6
+public-release exit remains blocked until external Phase 5 clean-VM smoke,
+7 remote nightlies, legal/trademark ADRs, signed release `dist/`, Stage A/B
+dogfood, public flip, and GitHub release complete.
