@@ -50,7 +50,7 @@
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-11, release pipeline mode active; Phase 1 runtime correction locally complete; release proof unblock next)
+### Current status (2026-06-11, release pipeline mode active; Phase 1 runtime correction + UI follow-up locally complete; release proof unblock next)
 
 Workflow update: `AGENTS.md`, this file, and `docs/codex/phase-status.md` now
 allow controlled release pipeline mode for the approved public `v0.1.0-mvp0`
@@ -67,6 +67,14 @@ resize events through shell-owned center-pane sizing before resizing the termina
 PTY/parser/grid. Manual resize smoke opened PID `26696`, title
 `BongTerm - workspace`, resized to `900x600` and `1200x720`, and remained
 responsive.
+
+UI follow-up: composed-shell terminal rendering now uses shader-widget-local
+text coordinates instead of re-applying global window offsets, resource
+dashboard rows split title and metrics to avoid side-panel overlap, and the
+current-process CPU sampler returns `0.0%` on its first baseline sample. Manual
+wide visual smoke captured `BongTerm - workspace` at
+`C:\Users\souba\AppData\Local\Temp\bongterm-ui-smoke-wide-26320.png` with the
+terminal anchored to the center pane and the resource row readable.
 
 Committed closeout: `d221e06 feat(phase5): close hardening release prep` on
 branch `codex/phase5-hardening-closeout`. Worktree metadata was pruned and the
@@ -99,6 +107,11 @@ after commit `2cc345a fix(app): keep startup off font probing`. The previous
 startup synchronously probing system fonts; app boot now uses deterministic
 startup cell metrics and leaves real shaping to the renderer.
 
+Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute
+Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now
+logs that runner-specific condition as a skip only on GitHub Actions; local and
+reference machines still require Windows PowerShell coverage.
+
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
 #7 split/focus cycle, and #17 registered pane-process attribution are green locally.
@@ -113,12 +126,14 @@ wiring are present.
 
 Latest local verification:
 
-- `cargo test -p bongterm-app --test shell_app` — pass, 3 tests.
-- `cargo test -p bongterm-ui` — pass, 46 tests.
-- `cargo clippy -p bongterm-app -p bongterm-ui --all-targets --all-features -- -D warnings` — pass; vendored wezterm warnings still print from dependencies.
-- `cargo build -p bongterm-app` — pass.
-- `cargo fmt --all -- --check` — pass
-- `git diff --check` — pass
+- RED/GREEN UI follow-up targets: `cargo test -p bongterm-render shader_text_layout_uses_widget_local_origin`, `cargo test -p bongterm-ui resource_row_separates_title_from_metrics`, and `cargo test -p bongterm-ledger current_process_sampler_first_sample_sets_cpu_baseline` — each failed before implementation and passed after.
+- `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app` — pass.
+- `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings` — pass; vendored wezterm warnings still print from dependencies.
+- `cargo fmt --all -- --check` — pass; stable rustfmt still prints existing nightly-only config warnings.
+- `git diff --check` — pass.
+- `cargo test --workspace --quiet` — pass.
+- Manual wide visual smoke: `target\debug\bongterm-app.exe` opened `BongTerm - workspace`, screenshot `C:\Users\souba\AppData\Local\Temp\bongterm-ui-smoke-wide-26320.png` showed center-pane terminal alignment and non-overlapping resource metrics.
+- Earlier 1.R.3 checks remain green: `cargo test -p bongterm-app --test shell_app`, `cargo test -p bongterm-ui`, and `cargo build -p bongterm-app`.
 - `cargo run -p xtask -- package-msix` — pass
 - `cargo run -p xtask -- sbom` — pass
 - `cargo run -p xtask -- attestation` — pass

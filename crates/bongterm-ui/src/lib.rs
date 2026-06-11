@@ -61,6 +61,18 @@ pub struct ResourceRowVm {
     pub cpu_pct: String,
 }
 
+impl ResourceRowVm {
+    #[must_use]
+    pub fn title_line(&self) -> &str {
+        &self.category
+    }
+
+    #[must_use]
+    pub fn metrics_line(&self) -> String {
+        format!("pid {} | RSS {} | CPU {}", self.pid, self.rss, self.cpu_pct)
+    }
+}
+
 impl Default for ResourceDashboardVm {
     fn default() -> Self {
         Self {
@@ -95,13 +107,12 @@ impl ResourceDashboardVm {
         } else {
             for row_vm in self.rows.iter().take(6) {
                 col = col.push(
-                    row![
-                        text(&row_vm.category).width(Length::Fill),
-                        text(format!("pid {}", row_vm.pid)).size(12),
-                        text(&row_vm.rss).size(12),
-                        text(&row_vm.cpu_pct).size(12),
+                    column![
+                        text(row_vm.title_line()).size(13),
+                        text(row_vm.metrics_line()).size(12)
                     ]
-                    .spacing(6),
+                    .spacing(2)
+                    .width(Length::Fill),
                 );
             }
         }
@@ -1405,5 +1416,18 @@ mod tests {
         shell.update(ShellMessage::OnboardingFinish);
         assert!(!shell.is_onboarding_active());
         assert!(shell.settings().onboarding.completed);
+    }
+
+    #[test]
+    fn resource_row_separates_title_from_metrics() {
+        let row = ResourceRowVm {
+            category: "BongTerm".to_string(),
+            pid: 26_696,
+            rss: "15 MB".to_string(),
+            cpu_pct: "0.0%".to_string(),
+        };
+
+        assert_eq!(row.title_line(), "BongTerm");
+        assert_eq!(row.metrics_line(), "pid 26696 | RSS 15 MB | CPU 0.0%");
     }
 }

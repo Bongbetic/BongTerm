@@ -497,6 +497,11 @@ mod platform {
                 let user_100ns =
                     (u64::from(user.dwHighDateTime) << 32) | u64::from(user.dwLowDateTime);
                 let cpu_100ns = kernel_100ns + user_100ns;
+                if state.last_cpu_time_100ns == 0 {
+                    state.last_cpu_time_100ns = cpu_100ns;
+                    state.last_wall = now;
+                    return (rss_bytes, 0.0, 0, 0, 0);
+                }
                 let wall_elapsed = now.duration_since(state.last_wall);
                 let cpu_delta = cpu_100ns.saturating_sub(state.last_cpu_time_100ns);
                 state.last_cpu_time_100ns = cpu_100ns;
@@ -774,6 +779,18 @@ mod tests {
         for _ in 0..3 {
             let _ = sampler.take_sample();
         }
+    }
+
+    // Exact sentinel: the first sample establishes the CPU baseline and returns
+    // literal zero rather than a process-lifetime delta.
+    #[allow(clippy::float_cmp)]
+    #[test]
+    fn current_process_sampler_first_sample_sets_cpu_baseline() {
+        let vram = Arc::new(MockVramSampler::unavailable());
+        let sampler = CurrentProcessSampler::new(vram);
+        let sample = sampler.take_sample();
+
+        assert_eq!(sample.processes[0].cpu_fraction, 0.0);
     }
 
     // ── Windows-only: RSS is non-zero ──────────────────────────────────────

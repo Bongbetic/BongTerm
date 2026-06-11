@@ -343,6 +343,39 @@ impl iced::widget::shader::Pipeline for TerminalPipeline {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ShaderTextAreaLayout {
+    resolution_width: u32,
+    resolution_height: u32,
+    left: f32,
+    top: f32,
+    right: i32,
+    bottom: i32,
+}
+
+// Iced sets the render pass viewport to the shader widget bounds before drawing
+// custom primitives. Text coordinates therefore need to be local to this widget,
+// not re-offset by global `bounds.x/y`.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap
+)]
+fn shader_text_area_layout(bounds: &iced::Rectangle, scale: f32) -> ShaderTextAreaLayout {
+    let width = (bounds.width * scale).ceil().max(1.0);
+    let height = (bounds.height * scale).ceil().max(1.0);
+
+    ShaderTextAreaLayout {
+        resolution_width: width as u32,
+        resolution_height: height as u32,
+        left: 0.0,
+        top: 0.0,
+        right: width as i32,
+        bottom: height as i32,
+    }
+}
+
 /// Build the rich-text span stream (`(text, Attrs)` pairs) for `set_rich_text`.
 ///
 /// Spans are laid out row by row: within a row, runs are emitted in column
@@ -517,15 +550,15 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
     ) {
         let spans = build_rich_spans(&self.snapshot);
 
-        // The shader render pass covers the whole physical surface; positions and
-        // the cryoglyph viewport are in physical pixels, so scale logical bounds.
+        // Iced clips the render pass to the widget; use widget-local coordinates
+        // so composed layouts do not double-apply `bounds.x/y`.
         let scale = viewport.scale_factor();
-        let physical = viewport.physical_size();
+        let layout = shader_text_area_layout(bounds, scale);
         pipeline.viewport.update(
             queue,
             cryoglyph::Resolution {
-                width: physical.width,
-                height: physical.height,
+                width: layout.resolution_width,
+                height: layout.resolution_height,
             },
         );
 
@@ -552,18 +585,16 @@ impl iced::widget::shader::Primitive for TerminalPrimitive {
         );
         buffer.shape_until_scroll(&mut pipeline.font_system, false);
 
-        let left = bounds.x * scale;
-        let top = bounds.y * scale;
         let area = cryoglyph::TextArea {
             buffer: &buffer,
-            left,
-            top,
+            left: layout.left,
+            top: layout.top,
             scale,
             bounds: cryoglyph::TextBounds {
-                left: left as i32,
-                top: top as i32,
-                right: ((bounds.x + bounds.width) * scale) as i32,
-                bottom: ((bounds.y + bounds.height) * scale) as i32,
+                left: 0,
+                top: 0,
+                right: layout.right,
+                bottom: layout.bottom,
             },
             default_color: cryoglyph::Color::rgb(0xCC, 0xCC, 0xCC),
         };
@@ -1201,5 +1232,24 @@ mod tests {
         assert_eq!(grid_dims(800.0, 600.0, 8.0, 17.5), (100, 34));
         // A sub-cell area still yields a usable 1x1 grid.
         assert_eq!(grid_dims(2.0, 2.0, 8.0, 17.5), (1, 1));
+    }
+
+    #[allow(clippy::float_cmp)]
+    #[test]
+    fn shader_text_layout_uses_widget_local_origin() {
+        let bounds = iced::Rectangle {
+            x: 240.0,
+            y: 76.0,
+            width: 1000.0,
+            height: 700.0,
+        };
+        let layout = shader_text_area_layout(&bounds, 1.5);
+
+        assert_eq!(layout.left, 0.0);
+        assert_eq!(layout.top, 0.0);
+        assert_eq!(layout.right, 1500);
+        assert_eq!(layout.bottom, 1050);
+        assert_eq!(layout.resolution_width, 1500);
+        assert_eq!(layout.resolution_height, 1050);
     }
 }
