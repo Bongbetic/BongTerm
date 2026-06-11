@@ -7,7 +7,7 @@ Source of truth:
 - Execution control plane: `orca.md`
 
 Current focus: **Release pipeline mode active; release proof unblocked on
-default branch; remote nightly proof 1/7** on 2026-06-11.
+default branch; scheduled nightly proof 0/7** on 2026-06-11.
 
 Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
 chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
@@ -33,9 +33,11 @@ Release proof unblock is complete: PR #1 merged to `master` at merge commit
 `21e2feb` on 2026-06-11, and default branch now contains active `ci`,
 `nightly`, and tag-gated `release` workflows. Master CI run `27341442656`
 passed after the merge. Manual nightly run `27343029777` passed all gate steps,
-so remote nightly proof is **1/7 green**. The remaining six green nightlies,
-real signed `dist/`, clean-VM signed install smoke, dogfood, legal/name
-decision, public flip, and GitHub release remain hard blockers.
+proving workflow health. This manual dispatch does **not** satisfy the
+scheduled-nightly time gate: the required scheduled streak is still **0/7**
+until the first post-merge cron run completes. Real signed `dist/`, clean-VM
+signed install smoke, dogfood, legal/name decision, public flip, and GitHub
+release remain hard blockers.
 
 Last verification:
 
@@ -69,11 +71,11 @@ Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-
 Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
 Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`). PR #1 `correctness` run `27318475490` passed on 2026-06-11 after commit `2cc345a fix(app): keep startup off font probing`; the prior Gate #4 CI failure was fixed by removing synchronous font probing from app boot. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. A dev-signed MSIX smoke artifact exists under `target/msix/` with public cert `target/msix/BongTerm-Dev.cer`.
 Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now skips only that runner-specific empty-stream condition on GitHub Actions; local/reference machines still require Windows PowerShell coverage.
-Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI run `27341442656` passed; first manual nightly run `27343029777` passed. Remote nightly proof is now 1/7.
+Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI run `27341442656` passed; manual nightly proof run `27343029777` passed. Scheduled nightly streak is still 0/7 because manual dispatch must not compress the release time gate.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
-| Phase 1 exit gates | Local green; remote proof 1/7 | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests); nightly run `27343029777` (pass) | Remote proof still blocked until 7/7 consecutive nightlies. |
+| Phase 1 exit gates | Local green; manual nightly proof green; scheduled 0/7 | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests); manual nightly run `27343029777` (pass) | Remote proof still blocked until 7/7 consecutive scheduled nightlies. |
 | UIA/accessibility | Local green | `cargo test -p bongterm-ui` (pass); `cargo test -p bongterm-test-kit` (pass) | Manual Narrator QA documented in `tests/accessibility/narrator_smoke.md`. |
 | IME + DPI | Local green | `cargo test -p bongterm-ui` (pass) | Live CJK IME QA remains manual. |
 | Renderer device loss | Local green | `cargo test -p bongterm-render device_loss` (pass) | Recovery policy falls back to software after repeated loss. |
@@ -86,8 +88,9 @@ Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI ru
 Next task: external release proof is blocked until a clean Windows VM, real
 signing certificate/toolchain, and signed MSIX path are available. `6.A.1`
 remains blocked and not executable until Phase 5 clean-VM signed install smoke
-proof and 7 consecutive remote nightly CI green runs are accepted or completed
-(last checked 2026-06-11T17:05:47+05:30; current nightly streak 1/7). Phase 6
+proof and 7 consecutive scheduled remote nightly CI green runs are accepted or
+completed (last checked 2026-06-11T17:38:13+05:30; current scheduled streak
+0/7; manual proof `27343029777` green). Phase 6
 public-release exit remains blocked until external Phase 5 clean-VM smoke,
 7 remote nightlies, legal/trademark ADRs, signed release `dist/`, Stage A/B
 dogfood, public flip, and GitHub release complete.
