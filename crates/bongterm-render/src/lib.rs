@@ -472,6 +472,16 @@ pub fn monospace_cell_size(font_size: f32) -> (f32, f32) {
     (cell_w, line_height)
 }
 
+/// Fast startup estimate for monospace cell size in **logical** pixels.
+///
+/// Real font probing can load system font metadata and is too expensive for the
+/// app's boot path. The renderer still performs real shaping when preparing a
+/// frame; this estimate is only for the initial grid until later calibration.
+#[must_use]
+pub const fn startup_monospace_cell_size(font_size: f32) -> (f32, f32) {
+    (font_size * 0.6, font_size * 1.25)
+}
+
 /// Compute terminal grid dimensions `(cols, rows)` that fit a content area of
 /// `width` × `height` **logical** pixels, given a cell size from
 /// [`monospace_cell_size`]. Always returns at least `1×1`.
@@ -1176,6 +1186,13 @@ mod tests {
             w > 3.0 && w < 20.0,
             "advance for 14px monospace out of range: {w}"
         );
+    }
+
+    #[test]
+    fn startup_monospace_cell_size_is_deterministic() {
+        let (w, h) = startup_monospace_cell_size(14.0);
+        assert!((w - 8.4).abs() < 0.001);
+        assert!((h - 17.5).abs() < 0.001);
     }
 
     #[test]

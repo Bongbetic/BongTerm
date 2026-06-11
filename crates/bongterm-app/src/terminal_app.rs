@@ -72,7 +72,7 @@ impl TerminalApp {
     pub fn boot() -> (Self, Task<Message>) {
         // The parser/grid starts empty; the worker (subscription) spawns the PTY
         // and the first prompt arrives as a `Message::Output`.
-        let (cell_w, cell_h) = bongterm_render::monospace_cell_size(FONT_SIZE);
+        let (cell_w, cell_h) = bongterm_render::startup_monospace_cell_size(FONT_SIZE);
         let mut adapter = WezTermAdapter::new(u32::from(COLS), u32::from(ROWS));
         let snapshot = to_render_snapshot(&adapter.current_snapshot());
         (

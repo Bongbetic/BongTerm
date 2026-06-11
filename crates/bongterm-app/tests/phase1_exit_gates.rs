@@ -18,8 +18,8 @@ fn gate04_cold_start_boot_path_stays_under_budget() {
     let (_app, task) = bongterm_app::TerminalApp::boot();
     drop(task);
     assert!(
-        start.elapsed() <= Duration::from_millis(1500),
-        "boot path exceeded 1.5s cold-start budget: {:?}",
+        start.elapsed() <= Duration::from_millis(300),
+        "boot path exceeded 300ms warm-start budget: {:?}",
         start.elapsed()
     );
 }
