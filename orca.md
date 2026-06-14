@@ -43,14 +43,14 @@
 | Phase | Status | Tag | Exit condition |
 |-------|--------|-----|----------------|
 | **Phase 0** Scaffold + Spikes | ✅ **COMPLETE** | `v0.0.4-phase0-exit` | All gates green; ADRs 003–007 Accepted |
-| **Phase 1** Usable Terminal | ✅ **LOCAL RUNTIME CORRECTION GREEN / MANUAL NIGHTLY PROOF GREEN / SCHEDULED 1/7** — corrective tasks `1.R.1`-`1.R.3` are complete locally; the composed runtime now sizes terminal grid/PTY/parser state from the shell center pane instead of the whole window. | — | §6.1 Phase 1 gates remain blocked until 7 consecutive scheduled remote nightlies are green. |
-| **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / MANUAL NIGHTLY PROOF GREEN / SCHEDULED 1/7** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required scheduled 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 scheduled nightlies |
+| **Phase 1** Usable Terminal | ✅ **LOCAL RUNTIME CORRECTION GREEN / MANUAL NIGHTLY PROOF GREEN / SCHEDULED 2/7** — corrective tasks `1.R.1`-`1.R.3` are complete locally; the composed runtime now sizes terminal grid/PTY/parser state from the shell center pane instead of the whole window. | — | §6.1 Phase 1 gates remain blocked until 7 consecutive scheduled remote nightlies are green. |
+| **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / MANUAL NIGHTLY PROOF GREEN / SCHEDULED 2/7** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required scheduled 7-nightly streak still needs remote CI time. | — | §6.1 #15,#24 green × 7 scheduled nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
 | **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; actual Stage A dogfood remains blocked until external Phase 5 smoke and remote-nightly proof are accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-12, release pipeline mode active; release proof unblocked on default branch; scheduled nightly proof 1/7)
+### Current status (2026-06-14, release pipeline mode active; release proof unblocked on default branch; scheduled nightly proof 2/7)
 
 Workflow update: `AGENTS.md`, this file, and `docs/codex/phase-status.md` now
 allow controlled release pipeline mode for the approved public `v0.1.0-mvp0`
@@ -121,12 +121,15 @@ scheduled-nightly time gate. The release workflow is present but still requires
 real signing secrets/certificate and a real signed `dist/` before a public
 release can be cut.
 
-Scheduled nightly proof update: first post-merge scheduled `nightly.yml` run
-`27411817353` on `master` passed on 2026-06-12 (created
-`2026-06-12T11:06:29Z`, completed `2026-06-12T11:20:46Z`) at head
-`af29c970d94965b43ed590930ea7c72755bef64f`. Manual dispatch run
-`27343029777` is excluded from the scheduled-only count. Current latest
-consecutive scheduled green streak: **1/7**.
+Scheduled nightly proof update: latest two post-merge scheduled `nightly.yml`
+runs on `master` passed: run `27463710495` on 2026-06-13 (created
+`2026-06-13T10:06:04Z`, completed `2026-06-13T10:18:46Z`) at head
+`a7000456ef0c403da5dd4694c4ac9c7bfe337fe3`, after run `27411817353` on
+2026-06-12 (created `2026-06-12T11:06:29Z`, completed
+`2026-06-12T11:20:46Z`) at head
+`af29c970d94965b43ed590930ea7c72755bef64f`. Manual dispatch run `27343029777`
+is excluded from the scheduled-only count. Current latest consecutive scheduled
+green streak: **2/7**.
 
 Phase 1 local exits are closed with `crates/bongterm-app/tests/phase1_exit_gates.rs`:
 #4 cold-start path, #5 RSS/VRAM measurability, #6 redundant-resize no repaint work,
@@ -159,13 +162,13 @@ Latest local verification:
 ### Next actionables (priority order)
 
 1. **[next][block] External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
-2. **[block] Remote nightly proof** — manual workflow proof `27343029777` is green but excluded; scheduled run `27411817353` passed on 2026-06-12, so the scheduled-only streak is **1/7**. This cannot be collapsed into a local session.
+2. **[block] Remote nightly proof** — manual workflow proof `27343029777` is green but excluded; scheduled runs `27411817353` (2026-06-12) and `27463710495` (2026-06-13) passed, so the scheduled-only streak is **2/7**. This cannot be collapsed into a local session.
 3. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
 4. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
 
-- **GitHub Actions remote proof** — default branch workflows now contain the exit gates; manual nightly proof `27343029777` is green but excluded, and scheduled run `27411817353` is green. The public-release proof remains blocked until the scheduled streak reaches 7/7.
+- **GitHub Actions remote proof** — default branch workflows now contain the exit gates; manual nightly proof `27343029777` is green but excluded, and scheduled runs `27411817353` and `27463710495` are green. The public-release proof remains blocked until the scheduled streak reaches 7/7.
 - **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
 - **`cargo xtask doctor`**: previous environment was missing `cl.exe` + `signtool.exe`; signed clean-VM smoke still depends on that external toolchain/cert environment.
@@ -258,7 +261,7 @@ Gates: spec §6.1 #15, #24.
 
 > **All Phase 2 implementation tasks complete** (2.A.0–2.C.3c + 2.D.1). Commits `5481a30`→`662e31b`. See `docs/codex/phase-status.md` for the per-task table.
 
-- 2.exit *(implementation done; true phase exit blocked on remote nightlies)* — gates #15 + #24 passed again locally on **2026-06-02** via `cargo test -p bongterm-agents --test gate15` and `cargo run -p xtask -- prompt-injection-corpus` (`32 scenarios passed gate #24`). Default `master` now has active `nightly.yml`; scheduled run `27411817353` passed on **2026-06-12**, so the scheduled-only streak is **1/7**. Exit remains blocked until the broader Phase 1/2 scheduled-nightly proof reaches 7/7.
+- 2.exit *(implementation done; true phase exit blocked on remote nightlies)* — gates #15 + #24 passed again locally on **2026-06-02** via `cargo test -p bongterm-agents --test gate15` and `cargo run -p xtask -- prompt-injection-corpus` (`32 scenarios passed gate #24`). Default `master` now has active `nightly.yml`; scheduled runs `27411817353` on **2026-06-12** and `27463710495` on **2026-06-13** passed, so the scheduled-only streak is **2/7**. Exit remains blocked until the broader Phase 1/2 scheduled-nightly proof reaches 7/7.
 
 ---
 
