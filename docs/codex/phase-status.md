@@ -7,7 +7,7 @@ Source of truth:
 - Execution control plane: `orca.md`
 
 Current focus: **Release pipeline mode active; release proof unblocked on
-default branch; scheduled nightly proof 3/7** on 2026-06-14.
+default branch; scheduled nightly proof 5/7** on 2026-06-16.
 
 Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
 chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
@@ -38,9 +38,15 @@ scheduled-nightly time gate. Real signed `dist/`, clean-VM signed install
 smoke, dogfood, legal/name decision, public flip, and GitHub release remain
 hard blockers.
 
-Scheduled nightly proof update: latest three post-merge scheduled `nightly.yml`
-runs on `master` passed: run `27496013141` on 2026-06-14 (created
-`2026-06-14T10:29:38Z`, completed `2026-06-14T10:42:40Z`) at head
+Scheduled nightly proof update: latest five post-merge scheduled `nightly.yml`
+runs on `master` passed: run `27616935145` on 2026-06-16 (created
+`2026-06-16T12:18:03Z`, completed `2026-06-16T12:32:02Z`) at head
+`a407217c21edb9c2f6a294d79808058e2972127e`, after run `27549311099` on
+2026-06-15 (created `2026-06-15T13:23:08Z`, completed
+`2026-06-15T13:37:38Z`) at head
+`a407217c21edb9c2f6a294d79808058e2972127e`, after run `27496013141` on
+2026-06-14 (created `2026-06-14T10:29:38Z`, completed
+`2026-06-14T10:42:40Z`) at head
 `f6c08eb977c2135580983d1489d0efa282f22b72`, after run `27463710495` on
 2026-06-13 (created `2026-06-13T10:06:04Z`, completed
 `2026-06-13T10:18:46Z`) at head
@@ -49,7 +55,7 @@ runs on `master` passed: run `27496013141` on 2026-06-14 (created
 `2026-06-12T11:20:46Z`) at head
 `af29c970d94965b43ed590930ea7c72755bef64f`. Manual dispatch run `27343029777`
 is excluded from the scheduled-only count. Current latest consecutive scheduled
-green streak: **3/7**.
+green streak: **5/7**.
 
 Last verification:
 
@@ -86,12 +92,13 @@ Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Wi
 Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI
 run `27341442656` passed; manual nightly proof run `27343029777` passed but is
 excluded from the release time gate. Scheduled nightly runs `27411817353`
-(2026-06-12), `27463710495` (2026-06-13), and `27496013141` (2026-06-14)
-passed, so the scheduled-only streak is now 3/7.
+(2026-06-12), `27463710495` (2026-06-13), `27496013141` (2026-06-14),
+`27549311099` (2026-06-15), and `27616935145` (2026-06-16) passed, so the
+scheduled-only streak is now 5/7.
 
 | Area | Status | Last test run | Notes/blockers |
 | --- | --- | --- | --- |
-| Phase 1 exit gates | Local green; manual nightly proof green; scheduled 3/7 | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests); manual nightly run `27343029777` (pass, excluded); scheduled nightly runs `27411817353` (pass, 2026-06-12), `27463710495` (pass, 2026-06-13), and `27496013141` (pass, 2026-06-14) | Remote proof still blocked until 7/7 consecutive scheduled nightlies. |
+| Phase 1 exit gates | Local green; manual nightly proof green; scheduled 5/7 | `cargo test -p bongterm-app --test phase1_exit_gates -- --nocapture` (pass, 5 tests); manual nightly run `27343029777` (pass, excluded); scheduled nightly runs `27411817353` (pass, 2026-06-12), `27463710495` (pass, 2026-06-13), `27496013141` (pass, 2026-06-14), `27549311099` (pass, 2026-06-15), and `27616935145` (pass, 2026-06-16) | Remote proof still blocked until 7/7 consecutive scheduled nightlies. |
 | UIA/accessibility | Local green | `cargo test -p bongterm-ui` (pass); `cargo test -p bongterm-test-kit` (pass) | Manual Narrator QA documented in `tests/accessibility/narrator_smoke.md`. |
 | IME + DPI | Local green | `cargo test -p bongterm-ui` (pass) | Live CJK IME QA remains manual. |
 | Renderer device loss | Local green | `cargo test -p bongterm-render device_loss` (pass) | Recovery policy falls back to software after repeated loss. |
@@ -105,9 +112,10 @@ Next task: external release proof is blocked until a clean Windows VM, real
 signing certificate/toolchain, and signed MSIX path are available. `6.A.1`
 remains blocked and not executable until Phase 5 clean-VM signed install smoke
 proof and 7 consecutive scheduled remote nightly CI green runs are accepted or
-completed (last checked 2026-06-14T21:51:54+05:30; current scheduled streak
-3/7; scheduled proofs `27411817353`, `27463710495`, and `27496013141` green;
-manual proof `27343029777` green but excluded). Phase 6
+completed (last checked 2026-06-16T18:22:43+05:30; current scheduled streak
+5/7; scheduled proofs `27411817353`, `27463710495`, `27496013141`,
+`27549311099`, and `27616935145` green; manual proof `27343029777` green but
+excluded). Phase 6
 public-release exit remains blocked until external Phase 5 clean-VM smoke,
 7 remote nightlies, legal/trademark ADRs, signed release `dist/`, Stage A/B
 dogfood, public flip, and GitHub release complete.
