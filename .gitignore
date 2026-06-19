@@ -12,6 +12,8 @@ Cargo.lock.bak
 # Local agent instructions
 AGENTS.md
 docs/
+handoff.md
+orca.md
 
 # OS
 Thumbs.db
