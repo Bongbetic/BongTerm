@@ -11,6 +11,7 @@ Cargo.lock.bak
 
 # Local agent instructions
 AGENTS.md
+docs/
 
 # OS
 Thumbs.db
