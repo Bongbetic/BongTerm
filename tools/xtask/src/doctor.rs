@@ -1,6 +1,8 @@
 //! `cargo xtask doctor` — environment readiness check.
 
 use anyhow::{Context, Result, anyhow};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn run() -> Result<()> {
@@ -77,11 +79,14 @@ fn check_rust_toolchain() -> Result<String> {
 }
 
 fn check_vs_build_tools() -> Result<String> {
-    Command::new("cl.exe")
+    let cl = find_on_path("cl.exe")
+        .or_else(find_visual_studio_cl)
+        .ok_or_else(|| anyhow!("cl.exe not found; install VS Build Tools 2022"))?;
+    Command::new(&cl)
         .arg("/?")
         .output()
-        .map_err(|_| anyhow!("cl.exe not on PATH; install VS Build Tools 2022"))?;
-    Ok("cl.exe present".to_string())
+        .with_context(|| format!("run {}", cl.display()))?;
+    Ok(cl.display().to_string())
 }
 
 fn check_windows_sdk() -> Result<String> {
@@ -95,12 +100,15 @@ fn check_windows_sdk() -> Result<String> {
 }
 
 fn check_msix_tooling() -> Result<String> {
-    let signtool = which("signtool.exe")?;
-    let makeappx = which("makeappx.exe").ok();
-    Ok(match makeappx {
-        Some(m) => format!("signtool={signtool}, makeappx={m}"),
-        None => format!("signtool={signtool}; makeappx missing (install via Win SDK)"),
-    })
+    let signtool = find_tool("signtool.exe")
+        .ok_or_else(|| anyhow!("signtool.exe not found; install Windows SDK signing tools"))?;
+    let makeappx = find_tool("makeappx.exe")
+        .ok_or_else(|| anyhow!("makeappx.exe not found; install Windows SDK MSIX tools"))?;
+    Ok(format!(
+        "signtool={}, makeappx={}",
+        signtool.display(),
+        makeappx.display()
+    ))
 }
 
 fn check_submodule_state() -> Result<String> {
@@ -154,15 +162,59 @@ fn check_wsl() -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-fn which(exe: &str) -> Result<String> {
-    let out = Command::new("where")
-        .arg(exe)
+fn find_tool(exe: &str) -> Option<PathBuf> {
+    find_on_path(exe).or_else(|| find_in_windows_sdk(exe))
+}
+
+fn find_on_path(exe: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(exe))
+        .find(|candidate| candidate.is_file())
+}
+
+fn find_in_windows_sdk(exe: &str) -> Option<PathBuf> {
+    let root = Path::new(r"C:\Program Files (x86)\Windows Kits\10\bin");
+    let mut versions = fs::read_dir(root)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect::<Vec<_>>();
+    versions.sort();
+    versions.reverse();
+
+    let arches = ["x64", "x86", "arm64"];
+    versions.into_iter().find_map(|version| {
+        arches
+            .iter()
+            .map(|arch| version.join(arch).join(exe))
+            .find(|candidate| candidate.is_file())
+    })
+}
+
+fn find_visual_studio_cl() -> Option<PathBuf> {
+    let vswhere =
+        Path::new(r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe");
+    if !vswhere.is_file() {
+        return None;
+    }
+
+    let out = Command::new(vswhere)
+        .args([
+            "-latest",
+            "-products",
+            "*",
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-find",
+            r"VC\Tools\MSVC\**\bin\Hostx64\x64\cl.exe",
+        ])
         .output()
-        .context("where command")?;
-    let s = String::from_utf8_lossy(&out.stdout);
-    let first = s
+        .ok()?;
+
+    String::from_utf8_lossy(&out.stdout)
         .lines()
-        .next()
-        .ok_or_else(|| anyhow!("{exe} not on PATH"))?;
-    Ok(first.trim().to_string())
+        .map(|line| PathBuf::from(line.trim()))
+        .find(|path| path.is_file())
 }

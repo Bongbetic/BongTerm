@@ -16,7 +16,9 @@
 > and blocker assessment before the next task starts. External time/manual gates
 > such as clean-VM signed smoke, 7 remote nightlies, and dogfood remain hard
 > gates and must not be faked or compressed. The 7-nightly gate is complete as
-> of 2026-06-18; the other gates remain hard blockers.
+> of 2026-06-18. Local MSIX packaging now produces a real unsigned package via
+> Windows SDK `makeappx`; signed `dist/`, clean-VM proof, dogfood, legal/name,
+> public flip, and GitHub release remain hard blockers.
 
 ---
 
@@ -48,10 +50,10 @@
 | **Phase 2** Agent Observability | ✅ **LOCAL EXIT GREEN / MANUAL NIGHTLY PROOF GREEN / SCHEDULED 7/7 COMPLETE** — all implementation tasks done; gates #15 + #24 are covered locally and in nightly workflow. Required scheduled 7-nightly streak is complete. | — | §6.1 #15,#24 green × 7 scheduled nightlies |
 | **Phase 3** Developer UX | ✅ **COMPLETE** — all tasks 3.A.0–3.F.1 + 3.exit.1 + 3.exit.2 done; §6.1 #9-14 gate tests are green locally. | — | §6.1 #9-14 green |
 | **Phase 4** MCP + Secrets + Security | ✅ **COMPLETE** — tasks 4.A.1–4.F.2 + threat-model docs done; local exit gate rerun GREEN on **2026-06-03** (`cargo test --workspace`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo xtask check-deps`, `cargo xtask secret-leak-corpus`). | — | §6.1 #16,#19,#23,#31 green + threat-model review |
-| **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — committed as `d221e06` on `codex/phase5-hardening-closeout`; local format, clippy, workspace tests, package, SBOM, attestation, forbidden-abstraction, and dependency checks green on **2026-06-03**. Clean-VM signed install smoke still requires external VM/cert environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
+| **Phase 5** Hardening + Release Prep | ✅ **LOCAL IMPLEMENTATION GREEN / MANUAL EXIT BLOCKED** — local package tooling now builds a real unsigned MSIX through Windows SDK `makeappx`; `cargo xtask doctor`, `package-msix`, `site-check`, `check-licenses`, and xtask tests are green on **2026-06-19**. Clean-VM signed install smoke still requires the real signing cert/VM environment. | — | §6.1 #18,#20,#21,#25,#26,#30 green + clean-VM smoke |
 | **Phase 6** Dogfood → Public | 📋 Prep-only started — Stage A protocol/template/summary exist; remote nightly gate is complete, but actual Stage A dogfood remains blocked until external Phase 5 clean-VM smoke is accepted or completed. | — | `v0.1.0-mvp0` shipped |
 
-### Current status (2026-06-18, release pipeline mode active; release proof unblocked on default branch; scheduled nightly proof 7/7 complete)
+### Current status (2026-06-19, release pipeline mode active; release proof unblocked on default branch; scheduled nightly proof 7/7 complete)
 
 Workflow update: `AGENTS.md`, this file, and `docs/codex/phase-status.md` now
 allow controlled release pipeline mode for the approved public `v0.1.0-mvp0`
@@ -93,14 +95,21 @@ Additional Phase 6 local prep is present: Stage B plan/summary skeletons,
 public-flip/community docs, install/privacy docs, static landing page, and xtask
 `checksums`, `release-verify`, and `site-check` subcommands. Local Phase 6
 tooling tests are green, but signed `dist/`, trademark/legal decision, real
-SECURITY inbox, dogfood, public flip, and GitHub release are not complete.
+dogfood, public flip, and GitHub release are not complete.
+
+Local shipping preflight update: `cargo xtask doctor` now finds VS Build Tools
+and Windows SDK tools even when `cl.exe`, `signtool.exe`, and `makeappx.exe`
+are installed outside `PATH`. `cargo xtask package-msix` no longer allows a
+placeholder package; it builds `bongterm-app --release`, stages the manifest,
+assets, and real executable, and writes `target/msix/BongTerm.msix` through
+Windows SDK `makeappx`. The 2026-06-19 local package is unsigned until
+`BONGT_SIGN_THUMBPRINT` is set.
 
 Testing unblock update: branch `codex/phase5-hardening-closeout` was pushed over
 SSH and PR #1 was opened. `SECURITY.md` now uses GitHub private vulnerability
-reporting instead of a placeholder inbox. A dev-signed MSIX smoke artifact exists
-at `target/msix/BongTerm.msix` with public cert `target/msix/BongTerm-Dev.cer`.
-This enables local/tester smoke, but it is not an OV-signed public release
-artifact and does not satisfy clean-VM public-release proof.
+reporting instead of a placeholder inbox. `target/msix/BongTerm.msix` is suitable
+for local/tester smoke only when the tester accepts that it is not a public
+release artifact unless signed with the real release certificate.
 
 PR CI proof update: PR #1 `correctness` run `27318475490` passed on 2026-06-11
 after commit `2cc345a fix(app): keep startup off font probing`. The previous
@@ -174,12 +183,26 @@ Latest local verification:
 - `cargo run -p xtask -- attestation` — pass
 - `cargo run -p xtask -- forbidden-abstraction` — pass
 - `cargo xtask check-deps` — pass
+- 2026-06-19 shipping preflight: `cargo fmt --all -- --check` — pass; stable
+  rustfmt still prints existing nightly-only config warnings.
+- 2026-06-19 shipping preflight: `cargo test -p xtask` — pass, 14 tests.
+- 2026-06-19 shipping preflight: `cargo xtask doctor` — pass; found VS Build
+  Tools `cl.exe`, Windows SDK, `signtool.exe`, and `makeappx.exe`.
+- 2026-06-19 shipping preflight: `cargo xtask package-msix` — pass; built real
+  unsigned `target/msix/BongTerm.msix` with Windows SDK `makeappx`.
+- 2026-06-19 shipping preflight: `cargo xtask site-check site` — pass.
+- 2026-06-19 shipping preflight: `cargo xtask check-licenses` — pass;
+  regenerated `THIRD_PARTY_NOTICES.md`.
+- 2026-06-19 shipping preflight: `cargo xtask release-verify dist` — fail as
+  expected because signed `dist/` release artifacts do not exist yet.
+- 2026-06-19 shipping preflight: `cargo xtask bench-report --gate` — timed out
+  after 184s; no benchmark gate pass claimed from this machine.
 
 ### Next actionables (priority order)
 
-1. **[next][block] External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate/toolchain.
+1. **[next][block] External release proof** — run signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate.
 2. **[done] Remote nightly proof** — manual workflow proof `27343029777` is green but excluded; scheduled runs `27411817353` (2026-06-12), `27463710495` (2026-06-13), `27496013141` (2026-06-14), `27549311099` (2026-06-15), `27616935145` (2026-06-16), `27687120185` (2026-06-17), and `27755555379` (2026-06-18) passed, so the scheduled-only streak is **7/7** and the remote nightly gate is complete.
-3. **Local/tester smoke** — use `target/msix/BongTerm.msix` and `target/msix/BongTerm-Dev.cer` for dev-channel package testing, or run from source.
+3. **Local/tester smoke** — use `target/msix/BongTerm.msix` for unsigned-package testing only when the tester accepts it is not a public release artifact, or run from source.
 4. **Phase 6 dogfood** — after external proof requirements are accepted or completed, begin Stage A dogfood using the prepared `docs/dogfood/_template.md`.
 
 ### Key known issues / deferred items
@@ -187,7 +210,7 @@ Latest local verification:
 - **GitHub Actions remote proof** — default branch workflows now contain the exit gates; manual nightly proof `27343029777` is green but excluded, and scheduled runs `27411817353`, `27463710495`, `27496013141`, `27549311099`, `27616935145`, `27687120185`, and `27755555379` are green. The scheduled remote nightly gate is complete.
 - **rustfmt nightly-vs-stable drift** — `rustfmt.toml` declares nightly-only opts (`imports_granularity`, `group_imports`) ignored by the stable fmt gate. Code is stable-formatted (CI passes); a *nightly* `cargo fmt` may re-introduce diffs. Fix permanently via a pinned-nightly fmt job or by dropping the two opts.
 - **wgpu workspace pin** bumped to `"27"` per ADR-008; glyphon replaced by cryoglyph
-- **`cargo xtask doctor`**: previous environment was missing `cl.exe` + `signtool.exe`; signed clean-VM smoke still depends on that external toolchain/cert environment.
+- **Signed clean-VM smoke**: local doctor now finds VS Build Tools and Windows SDK tooling, but public-release proof still depends on the real signing certificate, a signed MSIX, and clean-VM install/upgrade/uninstall evidence.
 - **CJK IME round-trip** — local IME state/composition tests are green; live IME/Narrator validation remains a manual QA pass.
 
 ### How to resume work

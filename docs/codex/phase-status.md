@@ -7,7 +7,8 @@ Source of truth:
 - Execution control plane: `orca.md`
 
 Current focus: **Release pipeline mode active; release proof unblocked on
-default branch; scheduled nightly proof 7/7 complete** on 2026-06-18.
+default branch; scheduled nightly proof 7/7 complete; local package tooling
+produces a real unsigned MSIX** on 2026-06-19.
 
 Workflow reset: user approved the public `v0.1.0-mvp0` ship plan and explicitly
 chose to change workflow cadence. `AGENTS.md` and `orca.md` now allow controlled
@@ -37,6 +38,12 @@ proving workflow health. This manual dispatch does **not** satisfy the
 scheduled-nightly time gate. Real signed `dist/`, clean-VM signed install
 smoke, dogfood, legal/name decision, public flip, and GitHub release remain
 hard blockers.
+
+Local shipping preflight update: on 2026-06-19, `cargo xtask doctor` found VS
+Build Tools and Windows SDK tools, and `cargo xtask package-msix` built a real
+unsigned `target/msix/BongTerm.msix` through Windows SDK `makeappx`. The package
+remains non-release until signed with the real certificate and validated on a
+clean Windows VM.
 
 Scheduled nightly proof update: latest seven post-merge scheduled `nightly.yml`
 runs on `master` passed: run `27755555379` on 2026-06-18 (created
@@ -86,14 +93,14 @@ scheduled remote nightlies are green.
 
 Phase 2 exit closure: local gates #15 and #24 are green and wired into nightly. The required 7 consecutive scheduled remote nightlies are green.
 
-Phase 5 exit closure: local code/doc/tooling gates are green and committed. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing toolchain/cert.
+Phase 5 exit closure: local code/doc/tooling gates are green and committed. The remaining Phase 5 exit proof is a signed MSIX install/upgrade/uninstall smoke on a clean Windows VM with the real signing certificate.
 
 Phase 6 prep: `docs/dogfood/README.md`, `docs/dogfood/_template.md`, and `docs/dogfood/stage-a-summary.md` now exist for 6.A.0. Stage A dogfood has **not** started.
 
 Additional Phase 6 local prep completed: Stage B plan/summary skeletons, public-flip/community docs, install/privacy docs, static landing page, and xtask `checksums`, `release-verify`, and `site-check` subcommands. Local xtask tests are green.
 
 Push/remote proof blocker: `git push -u origin codex/phase5-hardening-closeout` was rejected because the GitHub OAuth token lacks `workflow` scope for changed `.github/workflows/*.yml` files.
-Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`). PR #1 `correctness` run `27318475490` passed on 2026-06-11 after commit `2cc345a fix(app): keep startup off font probing`; the prior Gate #4 CI failure was fixed by removing synchronous font probing from app boot. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. A dev-signed MSIX smoke artifact exists under `target/msix/` with public cert `target/msix/BongTerm-Dev.cer`.
+Resolved for testing: branch pushed over SSH and PR #1 opened (`https://github.com/soubarnak/BongTerm/pull/1`). PR #1 `correctness` run `27318475490` passed on 2026-06-11 after commit `2cc345a fix(app): keep startup off font probing`; the prior Gate #4 CI failure was fixed by removing synchronous font probing from app boot. SECURITY placeholder is removed in favor of GitHub private vulnerability reporting. Local MSIX package smoke is unsigned unless `BONGT_SIGN_THUMBPRINT` is set.
 Follow-up CI smoke fix: GitHub-hosted Windows runners can resolve and execute Windows PowerShell but return an empty ConPTY stream. The shell smoke gate now skips only that runner-specific empty-stream condition on GitHub Actions; local/reference machines still require Windows PowerShell coverage.
 Default-branch proof update: PR #1 merged to `master` at `21e2feb`; master CI
 run `27341442656` passed; manual nightly proof run `27343029777` passed but is
@@ -111,12 +118,12 @@ streak is now 7/7 and the remote nightly gate is complete.
 | Renderer device loss | Local green | `cargo test -p bongterm-render device_loss` (pass) | Recovery policy falls back to software after repeated loss. |
 | Diagnostics/export/minidump/recovery | Local green | `cargo test -p bongterm-diagnostics` (pass) | Telemetry remains off by default; export bundle uses redaction preview. |
 | Forbidden abstraction/EDR | Local green | `cargo test -p bongterm-security forbidden` (pass); `cargo run -p xtask -- forbidden-abstraction` (pass) | Runtime auditor and static scan are present; external Defender/EDR smoke is documented. |
-| Release packaging | Local green | `cargo run -p xtask -- package-msix` (pass) | `makeappx.exe`/real signing cert/clean VM not available in this local proof. |
+| Release packaging | Local unsigned package green | `cargo xtask package-msix` (pass, 2026-06-19) | Built real unsigned `target/msix/BongTerm.msix` via Windows SDK `makeappx`; set `BONGT_SIGN_THUMBPRINT` for signing. Real signing cert and clean-VM proof remain blocked externally. |
 | SBOM + attestation | Local green | `cargo run -p xtask -- sbom` (pass); `cargo run -p xtask -- attestation` (pass) | Outputs: `sbom.cdx.json`, `attestation.intoto.jsonl`. |
-| Workspace gates | Green | PR #1 `correctness` run `27339704976` (pass); master CI run `27341442656` (pass); local follow-up checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app`, `cargo test --workspace --quiet` | Stable rustfmt warns that nightly-only rustfmt options are ignored; GitHub warns Node.js 20 actions will need update. |
+| Workspace gates | Green | PR #1 `correctness` run `27339704976` (pass); master CI run `27341442656` (pass); local follow-up checks on 2026-06-11: `cargo fmt --all -- --check`, `cargo clippy -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --all-targets --all-features -- -D warnings`, `cargo test -p bongterm-render -p bongterm-ui -p bongterm-ledger -p bongterm-app --test shell_app`, `cargo test --workspace --quiet`; 2026-06-19: `cargo fmt --all -- --check`, `cargo test -p xtask`, `cargo xtask doctor`, `cargo xtask package-msix`, `cargo xtask check-licenses`, `cargo xtask site-check site` | Stable rustfmt warns that nightly-only rustfmt options are ignored; GitHub warns Node.js 20 actions will need update. `cargo xtask release-verify dist` still fails until real signed `dist/` exists; `cargo xtask bench-report --gate` timed out after 184s. |
 
 Next task: external release proof is blocked until a clean Windows VM, real
-signing certificate/toolchain, and signed MSIX path are available. `6.A.1`
+signing certificate, and signed MSIX path are available. `6.A.1`
 remains blocked and not executable until Phase 5 clean-VM signed install smoke
 proof is accepted or completed (last checked 2026-06-18T18:22:35+05:30;
 current scheduled streak 7/7; scheduled proofs `27411817353`, `27463710495`,
