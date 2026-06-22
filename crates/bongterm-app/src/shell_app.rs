@@ -10,7 +10,7 @@ use bongterm_ledger::{
     CurrentProcessSampler, DashboardViewModel, DxgiVramSampler, ResourceSampler,
 };
 use bongterm_ui::{
-    BongTermShell, ResourceDashboardVm, ResourceRowVm, ShellMessage, TerminalSurfaceSize,
+    BongTermShell, MvpPanel, ResourceDashboardVm, ResourceRowVm, ShellMessage, TerminalSurfaceSize,
     agent_sidebar::AgentSidebarVm,
 };
 use iced::event::{self, Event};
@@ -47,7 +47,20 @@ impl BongTermApp {
 
     pub fn update(&mut self, message: AppMessage) -> Task<AppMessage> {
         match message {
-            AppMessage::Shell(message) => self.shell.update(message).map(AppMessage::Shell),
+            AppMessage::Shell(message) => {
+                let shell_task = self.shell.update(message).map(AppMessage::Shell);
+                if let Some(command) = self.shell.take_pending_terminal_command() {
+                    let mut bytes = command.into_bytes();
+                    bytes.extend_from_slice(b"\r");
+                    let terminal_task = self
+                        .terminal
+                        .update(terminal_app::Message::Input(bytes))
+                        .map(AppMessage::Terminal);
+                    Task::batch([shell_task, terminal_task])
+                } else {
+                    shell_task
+                }
+            }
             AppMessage::Terminal(message) => {
                 self.terminal.update(message).map(AppMessage::Terminal)
             }
@@ -111,6 +124,11 @@ impl BongTermApp {
     #[must_use]
     pub fn agent_sidebar_snapshot(&self) -> &AgentSidebarVm {
         self.shell.agent_sidebar_snapshot()
+    }
+
+    #[must_use]
+    pub const fn active_mvp_panel(&self) -> Option<MvpPanel> {
+        self.shell.active_panel()
     }
 
     #[must_use]

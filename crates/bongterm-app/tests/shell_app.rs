@@ -4,6 +4,8 @@
 //! chrome from `bongterm-ui` around the existing live terminal runtime, not the
 //! temporary one-pane terminal app directly.
 
+use bongterm_ui::{MvpPanel, ShellMessage};
+
 #[test]
 fn composed_app_boots_shell_chrome_and_terminal_runtime() {
     let (app, task) = bongterm_app::BongTermApp::boot();
@@ -48,4 +50,28 @@ fn composed_app_resizes_terminal_from_center_pane_bounds() {
 
     assert_eq!(app.terminal_grid_size(), expected);
     assert_ne!(app.terminal_grid_size(), (140, 40));
+}
+
+#[test]
+fn composed_app_cmdk_confirm_closes_panel_after_terminal_handoff() {
+    let (mut app, task) = bongterm_app::BongTermApp::boot();
+    drop(task);
+
+    drop(
+        app.update(bongterm_app::AppMessage::Shell(ShellMessage::OpenPanel(
+            MvpPanel::CmdK,
+        ))),
+    );
+    drop(app.update(bongterm_app::AppMessage::Shell(
+        ShellMessage::CmdKPromptChanged("show git status".to_string()),
+    )));
+    drop(app.update(bongterm_app::AppMessage::Shell(
+        ShellMessage::CmdKRequestPreview,
+    )));
+    assert_eq!(app.active_mvp_panel(), Some(MvpPanel::CmdK));
+
+    drop(app.update(bongterm_app::AppMessage::Shell(
+        ShellMessage::CmdKConfirmRun,
+    )));
+    assert_eq!(app.active_mvp_panel(), None);
 }

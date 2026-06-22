@@ -135,6 +135,18 @@ pub enum ShellFocus {
     CommandPalette,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MvpPanel {
+    CmdK,
+    SmartHistory,
+    Explainer,
+    Snippets,
+    BackgroundJobs,
+    CommandBlocks,
+    Mcp,
+    Diagnostics,
+}
+
 // ---------------------------------------------------------------------------
 // Command availability
 // ---------------------------------------------------------------------------
@@ -159,12 +171,15 @@ pub enum CommandId {
     SplitPane,
     FindInPane,
     OpenResourceDashboard,
-    // Phase 3 stubs — shown disabled in Phase 1
     CmdK,
     SmartHistory,
     ExplainLastFailed,
     AttachContext,
     ToggleBackgroundJobs,
+    OpenSnippets,
+    OpenCommandBlocks,
+    OpenMcpPanel,
+    OpenDiagnostics,
 }
 
 #[derive(Debug, Clone)]
@@ -198,96 +213,126 @@ pub struct CommandPalette {
 
 impl Default for CommandPalette {
     fn default() -> Self {
-        Self {
-            commands: vec![
-                CommandDefinition {
-                    id: CommandId::OpenCommandPalette,
-                    title: "Open Command Palette",
-                    category: "Shell",
-                    aliases: &["palette", "commands"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::ReloadSettings,
-                    title: "Reload Settings",
-                    category: "Settings",
-                    aliases: &["config", "json5"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::NewTab,
-                    title: "New Tab",
-                    category: "Terminal",
-                    aliases: &["shell"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::ClosePane,
-                    title: "Close Pane",
-                    category: "Terminal",
-                    aliases: &["close tab"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::SplitPane,
-                    title: "Split Pane",
-                    category: "Layout",
-                    aliases: &["split right", "split down"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::FindInPane,
-                    title: "Find in Pane",
-                    category: "Terminal",
-                    aliases: &["search", "find"],
-                    availability: CommandAvailability::Active,
-                },
-                CommandDefinition {
-                    id: CommandId::OpenResourceDashboard,
-                    title: "Open Resource Dashboard",
-                    category: "Resources",
-                    aliases: &["cpu", "rss", "vram"],
-                    availability: CommandAvailability::Active,
-                },
-                // Phase 3 stubs
-                CommandDefinition {
-                    id: CommandId::CmdK,
-                    title: "Cmd-K (Phase 3)",
-                    category: "Developer UX",
-                    aliases: &["ai", "ask", "explain"],
-                    availability: CommandAvailability::DisabledUntilPhase3,
-                },
-                CommandDefinition {
-                    id: CommandId::SmartHistory,
-                    title: "Smart History (Phase 3)",
-                    category: "History",
-                    aliases: &["history", "previous commands"],
-                    availability: CommandAvailability::DisabledUntilPhase3,
-                },
-                CommandDefinition {
-                    id: CommandId::ExplainLastFailed,
-                    title: "Explain Last Failed Command (Phase 3)",
-                    category: "Developer UX",
-                    aliases: &["error", "explain error"],
-                    availability: CommandAvailability::DisabledUntilPhase3,
-                },
-                CommandDefinition {
-                    id: CommandId::AttachContext,
-                    title: "Attach Context (Phase 3)",
-                    category: "Developer UX",
-                    aliases: &["context", "attach"],
-                    availability: CommandAvailability::DisabledUntilPhase3,
-                },
-                CommandDefinition {
-                    id: CommandId::ToggleBackgroundJobs,
-                    title: "Toggle Background Jobs (Phase 3)",
-                    category: "Jobs",
-                    aliases: &["jobs", "background", "tasks"],
-                    availability: CommandAvailability::DisabledUntilPhase3,
-                },
-            ],
-        }
+        let mut commands = phase1_commands();
+        commands.extend(mvp_commands());
+        Self { commands }
     }
+}
+
+fn active_command(
+    id: CommandId,
+    title: &'static str,
+    category: &'static str,
+    aliases: &'static [&'static str],
+) -> CommandDefinition {
+    CommandDefinition {
+        id,
+        title,
+        category,
+        aliases,
+        availability: CommandAvailability::Active,
+    }
+}
+
+fn phase1_commands() -> Vec<CommandDefinition> {
+    vec![
+        active_command(
+            CommandId::OpenCommandPalette,
+            "Open Command Palette",
+            "Shell",
+            &["palette", "commands"],
+        ),
+        active_command(
+            CommandId::ReloadSettings,
+            "Reload Settings",
+            "Settings",
+            &["config", "json5"],
+        ),
+        active_command(CommandId::NewTab, "New Tab", "Terminal", &["shell"]),
+        active_command(
+            CommandId::ClosePane,
+            "Close Pane",
+            "Terminal",
+            &["close tab"],
+        ),
+        active_command(
+            CommandId::SplitPane,
+            "Split Pane",
+            "Layout",
+            &["split right", "split down"],
+        ),
+        active_command(
+            CommandId::FindInPane,
+            "Find in Pane",
+            "Terminal",
+            &["search", "find"],
+        ),
+        active_command(
+            CommandId::OpenResourceDashboard,
+            "Open Resource Dashboard",
+            "Resources",
+            &["cpu", "rss", "vram"],
+        ),
+    ]
+}
+
+fn mvp_commands() -> Vec<CommandDefinition> {
+    vec![
+        active_command(
+            CommandId::CmdK,
+            "Cmd-K",
+            "Developer UX",
+            &["ai", "ask", "explain"],
+        ),
+        active_command(
+            CommandId::SmartHistory,
+            "Smart History",
+            "History",
+            &["history", "previous commands", "filters"],
+        ),
+        active_command(
+            CommandId::ExplainLastFailed,
+            "Explain Last Failed Command",
+            "Developer UX",
+            &["error", "explain error"],
+        ),
+        active_command(
+            CommandId::AttachContext,
+            "Attach Context",
+            "Developer UX",
+            &["context", "attach", "command block"],
+        ),
+        active_command(
+            CommandId::ToggleBackgroundJobs,
+            "Background Jobs",
+            "Jobs",
+            &["jobs", "background", "tasks"],
+        ),
+        active_command(
+            CommandId::OpenSnippets,
+            "Snippets",
+            "Developer UX",
+            &["snippet", "parameter prompt", "templates"],
+        ),
+        active_command(
+            CommandId::OpenCommandBlocks,
+            "Command Blocks",
+            "Terminal",
+            &["blocks", "confidence", "rerun", "export"],
+        ),
+        active_command(
+            CommandId::OpenMcpPanel,
+            "MCP Servers",
+            "MCP",
+            &["mcp", "json import", "permissions", "logs"],
+        ),
+        active_command(
+            CommandId::OpenDiagnostics,
+            "Diagnostics Export",
+            "Diagnostics",
+            &["telemetry", "logs", "redaction", "export"],
+        ),
+    ]
 }
 
 impl CommandPalette {
@@ -329,7 +374,11 @@ impl KeyboardMap {
     ) -> &'a str {
         match command {
             CommandId::OpenCommandPalette => &keybindings.command_palette,
-            CommandId::ReloadSettings => "",
+            CommandId::ReloadSettings
+            | CommandId::OpenSnippets
+            | CommandId::OpenCommandBlocks
+            | CommandId::OpenMcpPanel
+            | CommandId::OpenDiagnostics => "",
             CommandId::NewTab => &keybindings.new_tab,
             CommandId::ClosePane => &keybindings.close_pane,
             CommandId::SplitPane => &keybindings.split_pane,
@@ -487,6 +536,11 @@ pub enum ShellMessage {
     PaletteSelectNext,
     PaletteSelectPrev,
     PaletteExecuteSelected,
+    OpenPanel(MvpPanel),
+    ClosePanel,
+    CmdKPromptChanged(String),
+    CmdKRequestPreview,
+    CmdKConfirmRun,
     OnboardingAdvance,
     OnboardingFinish,
     AgentLifecycle {
@@ -521,6 +575,10 @@ pub struct BongTermShell {
     command_palette_open: bool,
     command_palette: CommandPalette,
     palette_state: PaletteState,
+    active_panel: Option<MvpPanel>,
+    cmdk_prompt: String,
+    cmdk_preview: Option<String>,
+    pending_terminal_command: Option<String>,
     keymap: KeyboardMap,
     settings: Settings,
     onboarding_active: bool,
@@ -550,6 +608,10 @@ impl BongTermShell {
             command_palette_open: false,
             command_palette: CommandPalette::default(),
             palette_state: PaletteState::default(),
+            active_panel: None,
+            cmdk_prompt: String::new(),
+            cmdk_preview: None,
+            pending_terminal_command: None,
             keymap: KeyboardMap,
             onboarding_active,
             onboarding_state: OnboardingState::new(),
@@ -623,6 +685,20 @@ impl BongTermShell {
         &self.command_palette
     }
 
+    #[must_use]
+    pub const fn active_panel(&self) -> Option<MvpPanel> {
+        self.active_panel
+    }
+
+    #[must_use]
+    pub fn cmdk_preview(&self) -> Option<&str> {
+        self.cmdk_preview.as_deref()
+    }
+
+    pub fn take_pending_terminal_command(&mut self) -> Option<String> {
+        self.pending_terminal_command.take()
+    }
+
     pub fn set_panel_data(
         &mut self,
         agent_sidebar: agent_sidebar::AgentSidebarVm,
@@ -665,9 +741,7 @@ impl BongTermShell {
 
     // match_same_arms: the empty `NoOp` arm is kept distinct from the empty
     //   agent/approval arms — they are semantically different messages.
-    // collapsible_if: the nested `if let Some(cmd)` / `if active` is left
-    //   un-collapsed so the `// Disabled commands` else-path comment stays put.
-    #[allow(clippy::match_same_arms, clippy::collapsible_if)]
+    #[allow(clippy::match_same_arms)]
     pub fn update(&mut self, message: ShellMessage) -> Task<ShellMessage> {
         match message {
             ShellMessage::NoOp => {}
@@ -706,15 +780,41 @@ impl BongTermShell {
             ShellMessage::PaletteExecuteSelected => {
                 if self.command_palette_open {
                     let results = self.command_palette.filter(self.palette_state.query());
-                    if let Some(cmd) = results.get(self.palette_state.selected_index()) {
-                        if cmd.availability == CommandAvailability::Active {
-                            self.command_palette_open = false;
-                            self.focus = ShellFocus::Terminal;
-                            self.palette_state.reset();
-                            // TODO(1.B+): route by command id once subsystems land
+                    if let Some(cmd) = results.get(self.palette_state.selected_index())
+                        && cmd.availability == CommandAvailability::Active
+                    {
+                        if let Some(panel) = panel_for_command(cmd.id) {
+                            self.open_panel(panel);
+                        } else if cmd.id == CommandId::OpenResourceDashboard {
+                            self.resource_dashboard_expanded = !self.resource_dashboard_expanded;
                         }
-                        // Disabled commands: keep palette open, no action
+                        self.command_palette_open = false;
+                        self.focus = ShellFocus::Terminal;
+                        self.palette_state.reset();
                     }
+                }
+            }
+            ShellMessage::OpenPanel(panel) => {
+                self.open_panel(panel);
+            }
+            ShellMessage::ClosePanel => {
+                self.active_panel = None;
+                self.focus = ShellFocus::Terminal;
+            }
+            ShellMessage::CmdKPromptChanged(prompt) => {
+                self.active_panel = Some(MvpPanel::CmdK);
+                self.cmdk_prompt = prompt;
+                self.cmdk_preview = None;
+            }
+            ShellMessage::CmdKRequestPreview => {
+                self.active_panel = Some(MvpPanel::CmdK);
+                self.cmdk_preview = cmdk_preview_for_prompt(&self.cmdk_prompt);
+            }
+            ShellMessage::CmdKConfirmRun => {
+                if let Some(command) = self.cmdk_preview.clone() {
+                    self.pending_terminal_command = Some(command);
+                    self.active_panel = None;
+                    self.focus = ShellFocus::Terminal;
                 }
             }
             ShellMessage::OnboardingAdvance => {
@@ -732,6 +832,11 @@ impl BongTermShell {
         }
 
         Task::none()
+    }
+
+    fn open_panel(&mut self, panel: MvpPanel) {
+        self.active_panel = Some(panel);
+        self.focus = ShellFocus::Terminal;
     }
 
     // `&self` is required: this is passed as `fn(&State) -> Subscription` to
@@ -814,21 +919,135 @@ impl BongTermShell {
             .padding(SHELL_OUTER_PADDING)
             .into();
 
-        if self.command_palette_open {
-            stack![base, self.palette_overlay().map(map_shell)].into()
-        } else {
-            base
+        let mut layered = stack![base];
+        if self.active_panel.is_some() {
+            layered = layered.push(self.mvp_panel_overlay().map(map_shell));
         }
+        if self.command_palette_open {
+            layered = layered.push(self.palette_overlay().map(map_shell));
+        }
+        if self.onboarding_active {
+            layered = layered.push(self.onboarding_overlay().map(map_shell));
+        }
+        layered.into()
     }
 
     #[must_use]
     pub fn view(&self) -> Element<'_, ShellMessage> {
-        let main = self.main_view();
-        if self.onboarding_active {
-            stack![main, self.onboarding_overlay()].into()
-        } else {
-            main
-        }
+        self.main_view()
+    }
+
+    fn mvp_panel_overlay(&self) -> Element<'_, ShellMessage> {
+        let Some(panel) = self.active_panel else {
+            return container(text("")).into();
+        };
+
+        let title = match panel {
+            MvpPanel::CmdK => "Cmd-K",
+            MvpPanel::SmartHistory => "Smart History",
+            MvpPanel::Explainer => "Explain Last Failed",
+            MvpPanel::Snippets => "Snippets",
+            MvpPanel::BackgroundJobs => "Background Jobs",
+            MvpPanel::CommandBlocks => "Command Blocks",
+            MvpPanel::Mcp => "MCP Servers",
+            MvpPanel::Diagnostics => "Diagnostics Export",
+        };
+
+        let body = match panel {
+            MvpPanel::CmdK => self.cmdk_panel_body(),
+            MvpPanel::SmartHistory => panel_lines(&[
+                "Filters: cwd: branch: agent: exit: time: shell: duration:",
+                "Selection inserts the chosen command into the active terminal.",
+                "No history command auto-runs from this surface.",
+            ]),
+            MvpPanel::Explainer => panel_lines(&[
+                "Explainer is scoped to the last failed command block.",
+                "Unavailable when no failed block is selected.",
+                "Output is previewed before any follow-up action.",
+            ]),
+            MvpPanel::Snippets => panel_lines(&[
+                "Snippet parameters are prompted before insertion.",
+                "Missing parameters block terminal insertion.",
+                "Confirmed snippets insert into the active terminal only.",
+            ]),
+            MvpPanel::BackgroundJobs => panel_lines(&[
+                "Jobs show running, completed, and failed states.",
+                "Completion emits a toast and updates the pane badge.",
+                "Background reruns stay attached to their command block.",
+            ]),
+            MvpPanel::CommandBlocks => panel_lines(&[
+                "Blocks show confidence, degraded/fallback state, and exit code.",
+                "Actions: copy, rerun, explain, attach, save as snippet, background rerun.",
+                "Filters and export operate on captured command blocks.",
+            ]),
+            MvpPanel::Mcp => panel_lines(&[
+                "Import JSON, preview command, and review permission summary.",
+                "Health, logs, visible process tree, and JobObject caps are shown here.",
+                "Secret references are disclosed without rendering secret values.",
+            ]),
+            MvpPanel::Diagnostics => panel_lines(&[
+                "Export lists exact files, logs, process metrics, and OS/hardware metadata.",
+                "Command history redaction preview and secret summary are shown before save.",
+                "Local save/copy only; upload remains opt-in.",
+            ]),
+        };
+
+        let card = container(
+            column![
+                row![
+                    text(title).size(20).width(Length::Fill),
+                    button(text("Close")).on_press(ShellMessage::ClosePanel)
+                ]
+                .spacing(8),
+                body,
+            ]
+            .spacing(16),
+        )
+        .width(Length::Fixed(620.0))
+        .padding(16)
+        .style(|_theme: &Theme| iced::widget::container::Style {
+            background: Some(iced::Background::Color(iced::Color::from_rgb(
+                0.12, 0.12, 0.15,
+            ))),
+            border: iced::Border {
+                color: iced::Color::from_rgb(0.35, 0.35, 0.45),
+                width: 1.0,
+                radius: 8.0.into(),
+            },
+            ..Default::default()
+        });
+
+        container(card)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(iced::alignment::Horizontal::Center)
+            .align_y(iced::alignment::Vertical::Center)
+            .into()
+    }
+
+    fn cmdk_panel_body(&self) -> Element<'_, ShellMessage> {
+        let prompt = text_input("Describe the command to prepare...", &self.cmdk_prompt)
+            .on_input(ShellMessage::CmdKPromptChanged)
+            .on_submit(ShellMessage::CmdKRequestPreview)
+            .padding(8);
+
+        let preview = self
+            .cmdk_preview
+            .as_deref()
+            .unwrap_or("No preview generated yet.");
+
+        column![
+            text("Preview is generated first; confirm sends it to the terminal."),
+            prompt,
+            row![
+                button(text("Preview")).on_press(ShellMessage::CmdKRequestPreview),
+                button(text("Confirm")).on_press(ShellMessage::CmdKConfirmRun),
+            ]
+            .spacing(8),
+            text(format!("Preview: {preview}")).size(13),
+        ]
+        .spacing(10)
+        .into()
     }
 
     fn palette_overlay(&self) -> Element<'_, ShellMessage> {
@@ -989,6 +1208,58 @@ impl BongTermShell {
     pub const fn theme(&self) -> Theme {
         Theme::Dark
     }
+}
+
+fn panel_for_command(command: CommandId) -> Option<MvpPanel> {
+    match command {
+        CommandId::CmdK => Some(MvpPanel::CmdK),
+        CommandId::SmartHistory => Some(MvpPanel::SmartHistory),
+        CommandId::ExplainLastFailed => Some(MvpPanel::Explainer),
+        CommandId::AttachContext | CommandId::OpenCommandBlocks => Some(MvpPanel::CommandBlocks),
+        CommandId::ToggleBackgroundJobs => Some(MvpPanel::BackgroundJobs),
+        CommandId::OpenSnippets => Some(MvpPanel::Snippets),
+        CommandId::OpenMcpPanel => Some(MvpPanel::Mcp),
+        CommandId::OpenDiagnostics => Some(MvpPanel::Diagnostics),
+        CommandId::OpenCommandPalette
+        | CommandId::ReloadSettings
+        | CommandId::NewTab
+        | CommandId::ClosePane
+        | CommandId::SplitPane
+        | CommandId::FindInPane
+        | CommandId::OpenResourceDashboard => None,
+    }
+}
+
+fn cmdk_preview_for_prompt(prompt: &str) -> Option<String> {
+    let trimmed = prompt.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    let command = if lower.contains("git") && lower.contains("status") {
+        "git status"
+    } else if lower.contains("list") && lower.contains("file") {
+        "dir"
+    } else if let Some(stripped) = trimmed.strip_prefix('$') {
+        stripped.trim()
+    } else {
+        trimmed
+    };
+
+    if command.is_empty() {
+        None
+    } else {
+        Some(command.to_string())
+    }
+}
+
+fn panel_lines(lines: &[&str]) -> Element<'static, ShellMessage> {
+    let mut col = column![].spacing(8);
+    for line in lines {
+        col = col.push(text((*line).to_string()).size(13));
+    }
+    col.into()
 }
 
 fn palette_row<'a>(
@@ -1216,7 +1487,7 @@ mod tests {
     }
 
     #[test]
-    fn phase3_stub_commands_are_marked_disabled() {
+    fn phase3_commands_are_active_after_mvp_ui_wiring() {
         let palette = CommandPalette::default();
         for id in [
             CommandId::CmdK,
@@ -1228,8 +1499,8 @@ mod tests {
             let cmd = palette.all_commands().iter().find(|c| c.id == id).unwrap();
             assert_eq!(
                 cmd.availability,
-                CommandAvailability::DisabledUntilPhase3,
-                "{id:?} should be DisabledUntilPhase3"
+                CommandAvailability::Active,
+                "{id:?} should be active for MVP UI"
             );
         }
     }
@@ -1298,23 +1569,51 @@ mod tests {
     }
 
     #[test]
-    fn shell_execute_disabled_command_keeps_palette_open() {
+    fn shell_execute_cmdk_command_opens_cmdk_panel() {
         let mut shell = BongTermShell::default();
         shell.update(ShellMessage::OpenCommandPalette);
         let palette = CommandPalette::default();
         let all = palette.all_commands();
-        let disabled_pos = all
-            .iter()
-            .position(|c| c.availability == CommandAvailability::DisabledUntilPhase3)
-            .unwrap();
-        for _ in 0..disabled_pos {
+        let cmdk_pos = all.iter().position(|c| c.id == CommandId::CmdK).unwrap();
+        for _ in 0..cmdk_pos {
             shell.update(ShellMessage::PaletteSelectNext);
         }
         shell.update(ShellMessage::PaletteExecuteSelected);
-        assert!(
-            shell.command_palette_open(),
-            "palette must stay open for disabled command"
+        assert!(!shell.command_palette_open());
+        assert_eq!(shell.active_panel(), Some(MvpPanel::CmdK));
+    }
+
+    #[test]
+    fn cmdk_preview_confirm_queues_terminal_command() {
+        let mut shell = BongTermShell::default();
+        shell.update(ShellMessage::OpenPanel(MvpPanel::CmdK));
+        shell.update(ShellMessage::CmdKPromptChanged(
+            "show git status".to_string(),
+        ));
+        shell.update(ShellMessage::CmdKRequestPreview);
+        assert_eq!(shell.cmdk_preview(), Some("git status"));
+        shell.update(ShellMessage::CmdKConfirmRun);
+        assert_eq!(
+            shell.take_pending_terminal_command(),
+            Some("git status".to_string())
         );
+    }
+
+    #[test]
+    fn mvp_panels_open_for_history_explainer_jobs_mcp_diagnostics() {
+        let mut shell = BongTermShell::default();
+        for panel in [
+            MvpPanel::SmartHistory,
+            MvpPanel::Explainer,
+            MvpPanel::Snippets,
+            MvpPanel::BackgroundJobs,
+            MvpPanel::CommandBlocks,
+            MvpPanel::Mcp,
+            MvpPanel::Diagnostics,
+        ] {
+            shell.update(ShellMessage::OpenPanel(panel));
+            assert_eq!(shell.active_panel(), Some(panel));
+        }
     }
 
     // --- 1.A.4 onboarding tests ---

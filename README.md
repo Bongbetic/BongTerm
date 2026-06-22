@@ -15,7 +15,10 @@ BongTerm is an experimental MVP-0 Windows terminal for developers who want AI-ag
 
 ## Status
 
-`v0.1.0-mvp0` is not public yet. Phase 6 is blocked on dogfood, signed clean-VM installer proof, 7 remote nightlies, and public release verification.
+`v0.1.0-mvp0` is not shipped yet. The repository is public and the 7 scheduled
+remote nightlies gate is complete, but shipment is still blocked on visible MVP
+UI real-state wiring, signed clean-VM installer proof, dogfood, legal/name
+review, and final GitHub release verification.
 
 ## Install
 
